@@ -1,40 +1,42 @@
 (ns hft.ea
   (:require
+   [clojure.string :as str]
    [hft.binance :as binance :refer [jread]]
    [hft.interop :refer [as-function]]
-   [java-time.api :as jt]
-   [clojure.string :as str])
+   [java-time.api :as jt])
   (:import
    [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]
    [io.jenetics Genotype LongChromosome LongGene]
-   [io.jenetics.engine Engine EvolutionResult]))
+   [io.jenetics.engine Engine EvolutionResult]
+   [io.jenetics.util BatchExecutor]))
 
-(def SYMBOL "BTCUSDT")
+(def SYMBOL "btcusdt")
 (def POPULATION-SIZE 500)
 (def GENERATIONS 10)
-(def STRATEGY-COMPLEXITY 5)
+(def TIMEFRAME->GENE
+  {:1hTicker 0
+   :4hTicker 1
+   :1dTicker 2})
+(def STRATEGY-COMPLEXITY (count (keys TIMEFRAME->GENE)))
 (def PRICE-MAX-CHANGE 1000)
 (def INITIAL-BALANCE 1000)
-(def TIMEFRAMES
-  {0  :1s
-   1  :1m
-   2  :3m
-   3  :5m
-   4  :15m
-   5  :30m
-   6  :1h
-   7  :2h
-   8  :4h
-   9  :6h
-   10 :8h
-   11 :12h
-   12 :1d})
 
-(defn wait-close-possibilty! [strategy stop-loss])
+(def price-changes (atom (transient {})))
 
-(defn wait-open-possibility! [strategy])
+(defn wait-close-possibilty! [strategy stop-loss]
+  (let [reality (->> @price-changes)
+        price (:bid-price @price-changes)]
+    (when (or (= strategy reality)
+              (<= price stop-loss))
+      price)))
 
-(defn simulate-intraday-trade! [id strategy]
+(defn wait-open-possibility! [strategy]
+  (let [reality (->> @price-changes)
+        price (:ask-price @price-changes)]
+    (when (= strategy reality)
+      price)))
+
+(defn simulate-intraday-trade! [strategy]
   (let [[buy-strategy sell-strategy] (vec strategy)
         start-time (jt/local-date)
         end-time (jt/plus start-time (jt/days 1))
@@ -47,13 +49,18 @@
         (if @order
           (let [stop-loss (- (:price @order) stop-loss-interval)
                 price (wait-close-possibilty! sell-strategy stop-loss)]
-            (swap! number-of-trades inc)
-            (swap! balance + (- price (:price @order)))
-            (reset! order nil))
+            (when price
+              (swap! number-of-trades inc)
+              (swap! balance + (- price (:price @order)))
+              (reset! order nil)))
           (let [price (wait-open-possibility! buy-strategy)]
-            (reset! order {:price price})))
+            (when price
+              (reset! order {:price price}))))
+        (Thread/sleep 1000)
         (recur)))
-    (+ (- @balance INITIAL-BALANCE) @number-of-trades)))
+    (+ (- @balance INITIAL-BALANCE) (if (zero? @number-of-trades)
+                                      (- 1000)
+                                      @number-of-trades))))
 
 (defn eval! [gt]
   (let [strategy (->> (range (.length gt))
@@ -62,29 +69,33 @@
                                  (.toArray)
                                  first))
                       (partition 2)
-                      (partition STRATEGY-COMPLEXITY))
-        strategy-id (random-uuid)]
-    (simulate-intraday-trade! strategy-id strategy)))
+                      (partition STRATEGY-COMPLEXITY))]
+    (simulate-intraday-trade! strategy)))
 
 (def timeframe-chromosome
-  (let [values (keys TIMEFRAMES)]
-    (LongGene/of (apply min values) (apply max values))))
+  (let [values (vals TIMEFRAME->GENE)]
+    (LongGene/of (apply min values) (inc (apply max values)))))
 
 (def price-change-chromosome
   (LongGene/of (- PRICE-MAX-CHANGE) PRICE-MAX-CHANGE))
 
 (defn start-prices-stream! []
-  (let [stream (str (str/lower-case SYMBOL) "@kline_1s")]
-    (binance/subscribe [stream]
+  (let [streams (set [(str SYMBOL "@ticker_1h")
+                      (str SYMBOL "@ticker_4h")
+                      (str SYMBOL "@ticker_1d")])
+        depth-stream (str SYMBOL "@depth5")]
+    (binance/subscribe (conj streams depth-stream)
                        (reify WebSocketMessageCallback
                          ^void (onMessage [_ event-str]
                                           (try
                                             (let [event (jread event-str)
                                                   data (:data event)]
-                                              (cond
-                                                (and (= (:stream event) stream)
-                                                     (= (:e data) "kline"))
-                                                (let [price (-> data :k :c)])))
+                                              (when (= (:stream event) depth-stream)
+                                                (swap! price-changes assoc! :ask-price (-> data :asks ffirst parse-double))
+                                                (swap! price-changes assoc! :bid-price (-> data :bids ffirst parse-double)))
+                                              (when (contains? streams (:stream event))
+                                                (let [price-change (:p data)]
+                                                  (swap! price-changes assoc! (keyword (:e data)) price-change))))
                                             (catch Exception e (prn e))))))))
 
 (defn start-algorithm! []
@@ -94,6 +105,7 @@
                               (mapcat identity)))
         engine (-> (Engine/builder (as-function eval!) gtf)
                    (.populationSize POPULATION-SIZE)
+                   (.fitnessExecutor (BatchExecutor/ofVirtualThreads))
                    (.build))
         result (-> engine
                    (.stream)
