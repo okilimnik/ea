@@ -3,7 +3,8 @@
    [clojure.string :as str]
    [hft.binance :as binance :refer [jread]]
    [hft.interop :refer [as-function]]
-   [java-time.api :as jt])
+   [java-time.api :as jt]
+   [hft.xtdb :as db])
   (:import
    [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]
    [io.jenetics Genotype LongChromosome LongGene]
@@ -18,23 +19,34 @@
    :4hTicker 1
    :1dTicker 2})
 (def STRATEGY-COMPLEXITY (count (keys TIMEFRAME->GENE)))
-(def PRICE-MAX-CHANGE 1000)
+(def PRICE-MAX-CHANGE 2000)
 (def INITIAL-BALANCE 1000)
 
-(def price-changes (atom (transient {})))
+(def price-changes (atom {}))
+
+(defn price-changes->reality [changes]
+  (->> changes
+       (#(select-keys % (keys TIMEFRAME->GENE)))
+       (into [])
+       (map #(list ((first %) TIMEFRAME->GENE) (second %)))
+       (sort-by first)))
 
 (defn wait-close-possibilty! [strategy stop-loss]
-  (let [reality (->> @price-changes)
-        price (:bid-price @price-changes)]
-    (when (or (= strategy reality)
-              (<= price stop-loss))
-      price)))
+  (when (seq @price-changes)
+    (let [reality (->> @price-changes
+                       price-changes->reality)
+          price (:bid-price @price-changes)]
+      (when (or (= strategy reality)
+                (<= price stop-loss))
+        price))))
 
 (defn wait-open-possibility! [strategy]
-  (let [reality (->> @price-changes)
-        price (:ask-price @price-changes)]
-    (when (= strategy reality)
-      price)))
+  (when (seq @price-changes)
+    (let [reality (->> @price-changes
+                       price-changes->reality)
+          price (:ask-price @price-changes)]
+      (when (= strategy reality)
+        price))))
 
 (defn simulate-intraday-trade! [strategy]
   (let [[buy-strategy sell-strategy] (vec strategy)
@@ -91,11 +103,11 @@
                                             (let [event (jread event-str)
                                                   data (:data event)]
                                               (when (= (:stream event) depth-stream)
-                                                (swap! price-changes assoc! :ask-price (-> data :asks ffirst parse-double))
-                                                (swap! price-changes assoc! :bid-price (-> data :bids ffirst parse-double)))
+                                                (swap! price-changes assoc :ask-price (-> data :asks ffirst parse-double))
+                                                (swap! price-changes assoc :bid-price (-> data :bids ffirst parse-double)))
                                               (when (contains? streams (:stream event))
                                                 (let [price-change (:p data)]
-                                                  (swap! price-changes assoc! (keyword (:e data)) price-change))))
+                                                  (swap! price-changes assoc (keyword (:e data)) (int (parse-double price-change))))))
                                             (catch Exception e (prn e))))))))
 
 (defn start-algorithm! []
@@ -111,10 +123,13 @@
                    (.stream)
                    (.limit GENERATIONS)
                    (.collect (EvolutionResult/toBestGenotype)))]
-    (println result)))
+    (println result)
+    (db/put! {:xt/id (random-uuid)
+              :ea/timestamp (System/currentTimeMillis)
+              :ea/result (prn-str result)})))
 
 (defn -main [& args]
   (start-prices-stream!)
   (start-algorithm!))
 
-;; clj -M -m hft.model.ea
+;; clj -M -m hft.ea

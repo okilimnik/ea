@@ -1,10 +1,6 @@
 (ns hft.binance
-  (:require [clojure.set :as set]
-            [clojure.string :as str]
-            [hft.async :refer [vthread]]
-            [jsonista.core :as j])
+  (:require [jsonista.core :as j])
   (:import [com.binance.connector.client.impl SpotClientImpl WebSocketStreamClientImpl]
-           [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]
            [java.util ArrayList]))
 
 (def trade-client (atom nil))
