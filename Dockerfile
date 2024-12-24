@@ -1,6 +1,6 @@
 FROM clojure AS lein
-WORKDIR /src
-COPY . /src
+WORKDIR /ea
+COPY . /ea
 RUN clj -M -e "(compile 'ea.core)"
 RUN clj -M:uberjar --main-class ea.core
 
