@@ -71,6 +71,7 @@
         (recur)))
     (println "balance left: " @balance)
     (println "number of trades: " @number-of-trades)
+    (println "strategy: " strategy)
     (+ (- @balance INITIAL-BALANCE) (if (zero? @number-of-trades)
                                       (- 1000)
                                       @number-of-trades))))
