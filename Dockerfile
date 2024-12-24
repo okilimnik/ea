@@ -6,5 +6,5 @@ RUN clj -M:uberjar --main-class hft.core
 
 FROM container-registry.oracle.com/graalvm/jdk:22
 RUN microdnf install freetype fontconfig
-COPY --from=lein /src/target/hft.jar ./
+COPY --from=lein /src/target/ea.jar ./
 CMD ["java", "-jar", "ea.jar"]
