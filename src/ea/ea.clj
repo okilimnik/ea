@@ -1,10 +1,10 @@
-(ns hft.ea
+(ns ea.ea
   (:require
    [clojure.string :as str]
-   [hft.binance :as binance :refer [jread]]
-   [hft.interop :refer [as-function]]
+   [ea.binance :as binance :refer [jread]]
+   [ea.interop :refer [as-function]]
    [java-time.api :as jt]
-   [hft.xtdb :as db])
+   [ea.xtdb :as db])
   (:import
    [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]
    [io.jenetics Genotype LongChromosome LongGene]
@@ -132,4 +132,4 @@
   (start-prices-stream!)
   (start-algorithm!))
 
-;; clj -M -m hft.ea
+;; clj -M -m ea.ea

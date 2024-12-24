@@ -13,6 +13,6 @@
                      :replace-paths []
                      :main-opts     ["-m" "uberdeps.uberjar"]}}}
 
-;; clj -M -e "(compile 'hft.core)"
-;; clj -M:uberjar --main-class hft.core
+;; clj -M -e "(compile 'ea.core)"
+;; clj -M:uberjar --main-class ea.core
 ;; java -jar target/ea.jar -d

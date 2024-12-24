@@ -1,4 +1,4 @@
-(ns hft.async
+(ns ea.async
   (:require
    [clojure.core.async :refer [<!! >!! close! promise-chan]]
    [clojure.core.async.impl.concurrent :as conc])
@@ -27,7 +27,7 @@
           (.unstarted builder ^Runnable runnable))))))
 
 
-(defonce ^ExecutorService vthreads-executor (Executors/newThreadPerTaskExecutor (counted-vthread-factory "hft-vthread-pool-%d")))
+(defonce ^ExecutorService vthreads-executor (Executors/newThreadPerTaskExecutor (counted-vthread-factory "ea-vthread-pool-%d")))
 
 
 (defn vthread-call

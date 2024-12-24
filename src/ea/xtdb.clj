@@ -1,4 +1,4 @@
-(ns hft.xtdb
+(ns ea.xtdb
   (:require [xtdb.api :as xt]
             [clojure.string :as str]))
 

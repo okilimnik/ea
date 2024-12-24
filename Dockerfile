@@ -1,8 +1,8 @@
 FROM clojure AS lein
 WORKDIR /src
 COPY . /src
-RUN clj -M -e "(compile 'hft.core)"
-RUN clj -M:uberjar --main-class hft.core
+RUN clj -M -e "(compile 'ea.core)"
+RUN clj -M:uberjar --main-class ea.core
 
 FROM container-registry.oracle.com/graalvm/jdk:22
 RUN microdnf install freetype fontconfig

@@ -1,4 +1,4 @@
-(ns hft.interop
+(ns ea.interop
   (:import [java.util.function Function]))
 
 (defn as-function [f]

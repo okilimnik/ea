@@ -4,7 +4,7 @@ The ask price is the lowest price a seller is willing to accept for a security.
 
 
 ## Docker
-docker build -t hft .
+docker build -t ea .
 
 
 ## Books

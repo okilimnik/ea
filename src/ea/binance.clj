@@ -1,4 +1,4 @@
-(ns hft.binance
+(ns ea.binance
   (:require [jsonista.core :as j])
   (:import [com.binance.connector.client.impl SpotClientImpl WebSocketStreamClientImpl]
            [java.util ArrayList]))
