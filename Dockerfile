@@ -6,5 +6,5 @@ RUN clj -M:uberjar --main-class ea.core
 
 FROM container-registry.oracle.com/graalvm/jdk:22
 RUN microdnf install freetype fontconfig
-COPY --from=lein /src/target/ea.jar ./
+COPY --from=lein /ea/target/ea.jar ./
 CMD ["java", "-jar", "ea.jar"]
