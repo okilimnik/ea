@@ -1,10 +1,10 @@
 FROM clojure AS lein
-WORKDIR /ea
-COPY . /ea
+WORKDIR /app
+COPY . /app
 RUN clj -M -e "(compile 'ea.core)"
 RUN clj -M:uberjar --main-class ea.core
 
 FROM container-registry.oracle.com/graalvm/jdk:22
 RUN microdnf install freetype fontconfig
-COPY --from=lein /ea/target/ea.jar ./
-CMD ["java", "-jar", "ea.jar"]
+COPY --from=lein /app/target/app.jar ./
+CMD ["java", "-jar", "app.jar"]

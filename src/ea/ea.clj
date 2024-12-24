@@ -1,6 +1,5 @@
 (ns ea.ea
   (:require
-   [clojure.string :as str]
    [ea.binance :as binance :refer [jread]]
    [ea.interop :refer [as-function]]
    [java-time.api :as jt]
@@ -70,6 +69,8 @@
               (reset! order {:price price}))))
         (Thread/sleep 1000)
         (recur)))
+    (println "balance left: " @balance)
+    (println "number of trades: " @number-of-trades)
     (+ (- @balance INITIAL-BALANCE) (if (zero? @number-of-trades)
                                       (- 1000)
                                       @number-of-trades))))
