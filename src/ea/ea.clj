@@ -18,7 +18,7 @@
    :4hTicker 1
    :1dTicker 2})
 (def STRATEGY-COMPLEXITY (count (keys TIMEFRAME->GENE)))
-(def PRICE-MAX-CHANGE 2000)
+(def PRICE-MAX-CHANGE 50)
 (def INITIAL-BALANCE 1000)
 
 (def price-changes (atom {}))
@@ -109,7 +109,13 @@
                                                 (swap! price-changes assoc :bid-price (-> data :bids ffirst parse-double)))
                                               (when (contains? streams (:stream event))
                                                 (let [price-change (:p data)]
-                                                  (swap! price-changes assoc (keyword (:e data)) (int (parse-double price-change))))))
+                                                  (prn (keyword (:e data)) ": " (parse-double price-change))
+                                                  (swap! price-changes assoc (keyword (:e data))
+                                                         (int (/ (parse-double price-change)
+                                                                 (case (keyword (:e data))
+                                                                   :1hTicker 25
+                                                                   :4hTicker 50
+                                                                   :1dTicker 100)))))))
                                             (catch Exception e (prn e))))))))
 
 (defn start-algorithm! []
