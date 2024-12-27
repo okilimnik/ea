@@ -109,7 +109,6 @@
                                                 (swap! price-changes assoc :bid-price (-> data :bids ffirst parse-double)))
                                               (when (contains? streams (:stream event))
                                                 (let [price-change (:p data)]
-                                                  (prn (keyword (:e data)) ": " (parse-double price-change))
                                                   (swap! price-changes assoc (keyword (:e data))
                                                          (int (/ (parse-double price-change)
                                                                  (case (keyword (:e data))
