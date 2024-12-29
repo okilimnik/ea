@@ -11,14 +11,14 @@
    [io.jenetics.util BatchExecutor]))
 
 (def SYMBOL "btcusdt")
-(def POPULATION-SIZE 500)
-(def GENERATIONS 10)
+(def POPULATION-SIZE 10000)
+(def GENERATIONS 100)
 (def TIMEFRAME->GENE
   {:1hTicker 0
    :4hTicker 1
    :1dTicker 2})
 (def STRATEGY-COMPLEXITY (count (keys TIMEFRAME->GENE)))
-(def PRICE-MAX-CHANGE 50)
+(def PRICE-MAX-CHANGE 10)
 (def INITIAL-BALANCE 1000)
 
 (def price-changes (atom {}))
@@ -49,14 +49,14 @@
 
 (defn simulate-intraday-trade! [strategy]
   (let [[buy-strategy sell-strategy] (vec strategy)
-        start-time (jt/local-date)
+        start-time (jt/local-date-time)
         end-time (jt/plus start-time (jt/days 1))
         order (atom nil)
         balance (atom INITIAL-BALANCE)
         number-of-trades (atom 0)
         stop-loss-interval 200]
     (loop []
-      (when (jt/before? (jt/local-date) end-time)
+      (when (jt/before? (jt/local-date-time) end-time)
         (if @order
           (let [stop-loss (- (:price @order) stop-loss-interval)
                 price (wait-close-possibilty! sell-strategy stop-loss)]
@@ -69,9 +69,13 @@
               (reset! order {:price price}))))
         (Thread/sleep 1000)
         (recur)))
-    (println "balance left: " @balance)
-    (println "number of trades: " @number-of-trades)
-    (println "strategy: " strategy)
+    (when (> @number-of-trades 0)
+      (Thread/sleep (* 100 (rand-int 10)))
+      (println "balance left: " @balance)
+      (println "number of trades: " @number-of-trades)
+      (println "strategy: " strategy)
+      (println "reality: " (->> @price-changes
+                                price-changes->reality)))
     (+ (- @balance INITIAL-BALANCE) (if (zero? @number-of-trades)
                                       (- 1000)
                                       @number-of-trades))))
@@ -112,7 +116,7 @@
                                                   (swap! price-changes assoc (keyword (:e data))
                                                          (int (/ (parse-double price-change)
                                                                  (case (keyword (:e data))
-                                                                   :1hTicker 25
+                                                                   :1hTicker 50
                                                                    :4hTicker 50
                                                                    :1dTicker 100)))))))
                                             (catch Exception e (prn e))))))))
