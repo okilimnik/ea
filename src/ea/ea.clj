@@ -11,7 +11,7 @@
    [io.jenetics.util BatchExecutor]))
 
 (def SYMBOL "btcusdt")
-(def POPULATION-SIZE 10000)
+(def POPULATION-SIZE 1000)
 (def GENERATIONS 100)
 (def TIMEFRAME->GENE
   {:1hTicker 0
