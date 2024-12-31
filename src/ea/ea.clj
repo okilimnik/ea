@@ -18,7 +18,7 @@
    :4hTicker 1
    :1dTicker 2})
 (def STRATEGY-COMPLEXITY (count (keys TIMEFRAME->GENE)))
-(def PRICE-MAX-CHANGE 10)
+(def PRICE-MAX-CHANGE 20)
 (def INITIAL-BALANCE 1000)
 
 (def price-changes (atom {}))
@@ -116,7 +116,7 @@
                                                   (swap! price-changes assoc (keyword (:e data))
                                                          (int (/ (parse-double price-change)
                                                                  (case (keyword (:e data))
-                                                                   :1hTicker 50
+                                                                   :1hTicker 25
                                                                    :4hTicker 50
                                                                    :1dTicker 100)))))))
                                             (catch Exception e (prn e))))))))
