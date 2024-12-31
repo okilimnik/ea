@@ -76,9 +76,9 @@
       (println "strategy: " strategy)
       (println "reality: " (->> @price-changes
                                 price-changes->reality)))
-    (+ (- @balance INITIAL-BALANCE) (if (zero? @number-of-trades)
-                                      (- 1000)
-                                      @number-of-trades))))
+    (long (+ (- @balance INITIAL-BALANCE) (if (zero? @number-of-trades)
+                                            (- 1000)
+                                            @number-of-trades)))))
 
 (defn eval! [gt]
   (let [strategy (->> (range (.length gt))
