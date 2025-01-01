@@ -14,14 +14,24 @@
 (def POPULATION-SIZE 1000)
 (def GENERATIONS 100)
 (def TIMEFRAME->GENE
-  {:1hTicker 0
-   :4hTicker 1
-   :1dTicker 2})
+  {300 0 ;; 5min
+   900 1 ;; 15min
+   1800 2 ;; 30min
+   3600 3 ;; 1h
+   14400 4 ;; 4h
+   86400 5 ;; 1d
+   })
 (def STRATEGY-COMPLEXITY (count (keys TIMEFRAME->GENE)))
 (def PRICE-MAX-CHANGE 20)
 (def INITIAL-BALANCE 1000)
+(def PRICE-QUEUE-LENGTH 86400)
+
+(def prices-queue
+  (atom clojure.lang.PersistentQueue/EMPTY))
 
 (def price-changes (atom {}))
+
+(def algorithm-started? (atom false))
 
 (defn price-changes->reality [changes]
   (->> changes
@@ -97,29 +107,11 @@
 (def price-change-chromosome
   (LongGene/of (- PRICE-MAX-CHANGE) PRICE-MAX-CHANGE))
 
-(defn start-prices-stream! []
-  (let [streams (set [(str SYMBOL "@ticker_1h")
-                      (str SYMBOL "@ticker_4h")
-                      (str SYMBOL "@ticker_1d")])
-        depth-stream (str SYMBOL "@depth5")]
-    (binance/subscribe (conj streams depth-stream)
-                       (reify WebSocketMessageCallback
-                         ^void (onMessage [_ event-str]
-                                          (try
-                                            (let [event (jread event-str)
-                                                  data (:data event)]
-                                              (when (= (:stream event) depth-stream)
-                                                (swap! price-changes assoc :ask-price (-> data :asks ffirst parse-double))
-                                                (swap! price-changes assoc :bid-price (-> data :bids ffirst parse-double)))
-                                              (when (contains? streams (:stream event))
-                                                (let [price-change (:p data)]
-                                                  (swap! price-changes assoc (keyword (:e data))
-                                                         (int (/ (parse-double price-change)
-                                                                 (case (keyword (:e data))
-                                                                   :1hTicker 25
-                                                                   :4hTicker 50
-                                                                   :1dTicker 100)))))))
-                                            (catch Exception e (prn e))))))))
+(defn get-price-change-percent [k prices]
+  (let [last-price (last prices)
+        first-price (nth prices (- PRICE-QUEUE-LENGTH k))]
+    (int (* 100 (/ (- last-price first-price)
+                   first-price)))))
 
 (defn start-algorithm! []
   (let [gtf (Genotype/of (->> [(LongChromosome/of [timeframe-chromosome])
@@ -139,8 +131,30 @@
               :ea/timestamp (System/currentTimeMillis)
               :ea/result (prn-str result)})))
 
+(defn start-prices-stream! []
+  (let [depth-stream (str SYMBOL "@depth5")]
+    (binance/subscribe [depth-stream]
+                       (reify WebSocketMessageCallback
+                         ^void (onMessage [_ event-str]
+                                          (try
+                                            (let [event (jread event-str)
+                                                  data (:data event)]
+                                              (when (= (:stream event) depth-stream)
+                                                (swap! prices-queue #(as-> % $
+                                                                       (conj $ (-> data :asks ffirst parse-double))
+                                                                       (if (> (count $) PRICE-QUEUE-LENGTH)
+                                                                         (pop $)
+                                                                         $)))
+                                                (swap! price-changes assoc :ask-price (-> data :asks ffirst parse-double))
+                                                (swap! price-changes assoc :bid-price (-> data :bids ffirst parse-double))
+                                                (doseq [k (keys TIMEFRAME->GENE)]
+                                                  (let [price-change-percent (get-price-change-percent k @prices-queue)]
+                                                    (swap! price-changes assoc k price-change-percent)))
+                                                (when (and (not @algorithm-started?) (= (count @prices-queue) PRICE-QUEUE-LENGTH)) ;; warmed-up
+                                                  (start-algorithm!))))
+                                            (catch Exception e (prn e))))))))
+
 (defn -main [& args]
-  (start-prices-stream!)
-  (start-algorithm!))
+  (start-prices-stream!))
 
 ;; clj -M -m ea.ea
