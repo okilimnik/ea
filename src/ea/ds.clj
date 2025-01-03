@@ -5,6 +5,8 @@
   (:import
    [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]))
 
+(def cache (atom '()))
+
 (defn start-prices-stream! [symbol!]
   (let [depth-stream (str symbol! "@depth5")]
     (binance/subscribe [depth-stream]
@@ -14,10 +16,16 @@
                                             (let [event (jread event-str)
                                                   data (:data event)]
                                               (when (= (:stream event) depth-stream)
-                                                (db/put! (merge {:xt/id (db/gen-id [symbol!])
-                                                                 :order-book/last-update-id (:lastUpdateId data)
-                                                                 :order-book/bids (:bids data)
-                                                                 :order-book/asks (:asks data)}))))
+                                                (swap! cache (fn [old-cache]
+                                                               (as-> old-cache %
+                                                                 (conj % (merge {:xt/id (db/gen-id [symbol!])
+                                                                                 :order-book/last-update-id (:lastUpdateId data)
+                                                                                 :order-book/bids (:bids data)
+                                                                                 :order-book/asks (:asks data)}))
+                                                                 (if (= (count %) 50)
+                                                                   (do (db/put! %)
+                                                                       '())
+                                                                   %))))))
                                             (catch Exception e (prn e))))))))
 
 (defn -main [& args]

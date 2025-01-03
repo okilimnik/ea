@@ -17,7 +17,7 @@
 (defn gen-id [& parts]
   (str/join "-" (concat parts [(System/currentTimeMillis)])))
 
-(defn put! [& docs]
+(defn put! [docs]
   (when-not @node (init))
   (xt/submit-tx @node (for [doc docs]
                         [:xtdb.api/put doc]))
