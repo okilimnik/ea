@@ -2,7 +2,7 @@
   (:gen-class)
   (:require
    [ea.ea :as ea]
-   [ea.dataset :as ds]
+   [ea.ds :as ds]
    [ea.xtdb :as db]))
 
 (defn -main [& args]

@@ -21,7 +21,7 @@
   (when-not @node (init))
   (xt/submit-tx @node (for [doc docs]
                         [:xtdb.api/put doc]))
-  (xt/sync @node))
+  #_(xt/sync @node))
 
 (defn q [q & args]
   (when-not @node (init))

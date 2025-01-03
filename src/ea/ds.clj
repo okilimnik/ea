@@ -1,4 +1,4 @@
-(ns ea.dataset 
+(ns ea.ds
   (:require
    [ea.binance :as binance :refer [jread]]
    [ea.xtdb :as db]) 
