@@ -17,12 +17,6 @@
      (gcloud/upload-file! (io/file db/file))
      (recur))))
 
-(defn get-price-level [prices level]
-  (let [price-level (nth prices level)]
-    {:id (random-uuid)
-     :price (parse-double (first price-level))
-     :volume (parse-double (second price-level))}))
-
 (defn start-prices-stream! [symbol!]
   (let [depth-stream (str symbol! "@depth5")]
     (binance/subscribe [depth-stream]
@@ -35,13 +29,9 @@
                                                 (swap! cache (fn [old-cache]
                                                                (as-> old-cache %
                                                                  (conj % {:last_update_id (:lastUpdateId data)
-                                                                          :bid_0 (get-price-level (:bids data) 0)
-                                                                          :bid_1 (get-price-level (:bids data) 1)
-                                                                          :bid_2 (get-price-level (:bids data) 2)
-                                                                          :ask_0 (get-price-level (:asks data) 0)
-                                                                          :ask_1 (get-price-level (:asks data) 1)
-                                                                          :ask_2 (get-price-level (:asks data) 2)
-                                                                          :timestamp (System/currentTimeMillis)})
+                                                                          :bids (:bids data)
+                                                                          :asks (:asks data)
+                                                                          :timestamp (db/now)})
                                                                  (if (= (count %) 50)
                                                                    (do (db/insert! %)
                                                                        '())

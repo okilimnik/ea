@@ -7,12 +7,12 @@
 (def spec {:dbtype "duckdb" :dbname file})
 (def db (atom nil))
 
-(def table-price-levels 
+(def table-price-levels
   (str "CREATE TABLE IF NOT EXISTS price_levels ("
        "id UUID PRIMARY KEY, "
        "price FLOAT, "
        "volume FLOAT)"))
-(def table-order-books 
+(def table-order-books
   (str "CREATE TABLE IF NOT EXISTS order_books ("
        "id UUID PRIMARY KEY, "
        "last_update_id INTEGER, "
@@ -39,28 +39,51 @@
 (defn now []
   (java.sql.Timestamp. (System/currentTimeMillis)))
 
+(defn get-price-level [prices level]
+  (let [price-level (nth prices level)]
+    {:id (random-uuid)
+     :price (parse-double (first price-level))
+     :volume (parse-double (second price-level))}))
+
+(defn unrwap-price-levels [doc]
+  {:bid_0 (get-price-level (:bids doc) 0)
+   :bid_1 (get-price-level (:bids doc) 1)
+   :bid_2 (get-price-level (:bids doc) 2)
+   :ask_0 (get-price-level (:asks doc) 0)
+   :ask_1 (get-price-level (:asks doc) 1)
+   :ask_2 (get-price-level (:asks doc) 2)})
+
 (defn insert! [docs]
-  )
+  (let [cmds (mapcat
+              (fn [doc]
+                (let [price-levels (unrwap-price-levels doc)]
+                  [{:insert-into [:price_levels]
+                    :values      (vals price-levels)}
+                   {:insert-into [:order_books]
+                    :values [(reduce-kv (fn [m k v] (assoc m k (:id v))) doc price-levels)]}]))
+              docs)]
+    (doseq [cmd cmds]
+      (jdbc/execute! @db (sql/format cmd)))))
 
 (defn -main [& args]
   (init)
   (let [ask-id (random-uuid)
         bid-id (random-uuid)
-        cmd1 {:insert-into [:price_levels]
-              :values [{:id ask-id
-                        :price 1.0
-                        :volume 2.0}
-                       {:id bid-id
-                        :price 1.0
-                        :volume 2.0}]}
-        cmd2 {:insert-into [:order_books]
-              :values [{:id (random-uuid)
-                        :last_update_id 2
-                        :bid_0 bid-id
-                        :ask_0 ask-id
-                        :timestamp (now)}]}]
-    (jdbc/execute! @db (sql/format cmd1))
-    (jdbc/execute! @db (sql/format cmd2)))
+        cmds [{:insert-into [:price_levels]
+               :values [{:id ask-id
+                         :price 1.0
+                         :volume 2.0}
+                        {:id bid-id
+                         :price 1.0
+                         :volume 2.0}]}
+              {:insert-into [:order_books]
+               :values [{:id (random-uuid)
+                         :last_update_id 2
+                         :bid_0 bid-id
+                         :ask_0 ask-id
+                         :timestamp (now)}]}]]
+    (doseq [cmd cmds]
+      (jdbc/execute! @db (sql/format cmd))))
 
   (prn (jdbc/execute! @db (sql/format {:select [:*]
                                        :from   [:order_books]
