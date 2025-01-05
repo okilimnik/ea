@@ -1,11 +1,27 @@
 (ns ea.ds
   (:require
+   [clojure.java.io :as io]
+   [ea.async :refer [vthread]]
    [ea.binance :as binance :refer [jread]]
-   [ea.xtdb :as db]) 
+   [ea.db :as db]
+   [ea.gcloud :as gcloud]) 
   (:import
    [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]))
 
 (def cache (atom '()))
+
+(defn start-file-uploader! []
+  (vthread
+   (loop []
+     (Thread/sleep (* 1000 60 60))
+     (gcloud/upload-file! (io/file db/file))
+     (recur))))
+
+(defn get-price-level [prices level]
+  (let [price-level (nth prices level)]
+    {:id (random-uuid)
+     :price (parse-double (first price-level))
+     :volume (parse-double (second price-level))}))
 
 (defn start-prices-stream! [symbol!]
   (let [depth-stream (str symbol! "@depth5")]
@@ -18,18 +34,23 @@
                                               (when (= (:stream event) depth-stream)
                                                 (swap! cache (fn [old-cache]
                                                                (as-> old-cache %
-                                                                 (conj % (merge {:xt/id (db/gen-id [symbol!])
-                                                                                 :order-book/last-update-id (:lastUpdateId data)
-                                                                                 :order-book/bids (:bids data)
-                                                                                 :order-book/asks (:asks data)}))
+                                                                 (conj % {:last_update_id (:lastUpdateId data)
+                                                                          :bid_0 (get-price-level (:bids data) 0)
+                                                                          :bid_1 (get-price-level (:bids data) 1)
+                                                                          :bid_2 (get-price-level (:bids data) 2)
+                                                                          :ask_0 (get-price-level (:asks data) 0)
+                                                                          :ask_1 (get-price-level (:asks data) 1)
+                                                                          :ask_2 (get-price-level (:asks data) 2)
+                                                                          :timestamp (System/currentTimeMillis)})
                                                                  (if (= (count %) 50)
-                                                                   (do (db/put! %)
+                                                                   (do (db/insert! %)
                                                                        '())
                                                                    %))))))
                                             (catch Exception e (prn e))))))))
 
 (defn -main [& args]
   (println "symbol: " (first args))
+  (start-file-uploader!)
   (start-prices-stream! (first args)))
 
 ;; clj -M -m ea.dataset btcusdt

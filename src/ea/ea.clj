@@ -2,8 +2,7 @@
   (:require
    [ea.binance :as binance :refer [jread]]
    [ea.interop :refer [as-function]]
-   [java-time.api :as jt]
-   [ea.xtdb :as db])
+   [java-time.api :as jt])
   (:import
    [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]
    [io.jenetics Genotype LongChromosome LongGene]
@@ -126,10 +125,7 @@
                    (.stream)
                    (.limit GENERATIONS)
                    (.collect (EvolutionResult/toBestGenotype)))]
-    (println result)
-    (db/put! {:xt/id (random-uuid)
-              :ea/timestamp (System/currentTimeMillis)
-              :ea/result (prn-str result)})))
+    (println result)))
 
 (defn start-prices-stream! []
   (let [depth-stream (str SYMBOL "@depth5")]

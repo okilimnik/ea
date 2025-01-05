@@ -2,11 +2,9 @@
   (:gen-class)
   (:require
    [ea.ea :as ea]
-   [ea.ds :as ds]
-   [ea.xtdb :as db]))
+   [ea.ds :as ds]))
 
 (defn -main [& args]
-  (db/init)
   (ds/-main "btcusdt")
   #_(ea/-main args))
 
