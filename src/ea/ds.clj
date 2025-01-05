@@ -4,11 +4,9 @@
    [ea.async :refer [vthread]]
    [ea.binance :as binance :refer [jread]]
    [ea.db :as db]
-   [ea.gcloud :as gcloud]) 
+   [ea.gcloud :as gcloud])
   (:import
    [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]))
-
-(def cache (atom '()))
 
 (defn start-file-uploader! []
   (vthread
@@ -26,16 +24,7 @@
                                             (let [event (jread event-str)
                                                   data (:data event)]
                                               (when (= (:stream event) depth-stream)
-                                                (swap! cache (fn [old-cache]
-                                                               (as-> old-cache %
-                                                                 (conj % {:last_update_id (:lastUpdateId data)
-                                                                          :bids (:bids data)
-                                                                          :asks (:asks data)
-                                                                          :timestamp (db/now)})
-                                                                 (if (= (count %) 50)
-                                                                   (do (db/insert! %)
-                                                                       '())
-                                                                   %))))))
+                                                (db/insert! data)))
                                             (catch Exception e (prn e))))))))
 
 (defn -main [& args]

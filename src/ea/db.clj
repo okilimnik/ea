@@ -15,7 +15,7 @@
 (def table-order-books
   (str "CREATE TABLE IF NOT EXISTS order_books ("
        "id UUID PRIMARY KEY, "
-       "last_update_id INTEGER, "
+       "last_update_id BIGINT, "
        "bid_0 UUID, "
        "bid_1 UUID, "
        "bid_2 UUID, "
@@ -53,15 +53,15 @@
    :ask_1 (get-price-level (:asks doc) 1)
    :ask_2 (get-price-level (:asks doc) 2)})
 
-(defn insert! [docs]
-  (let [cmds (mapcat
-              (fn [doc]
-                (let [price-levels (unrwap-price-levels doc)]
-                  [{:insert-into [:price_levels]
-                    :values      (vals price-levels)}
-                   {:insert-into [:order_books]
-                    :values [(reduce-kv (fn [m k v] (assoc m k (:id v))) doc price-levels)]}]))
-              docs)]
+(defn insert! [doc]
+  (when-not @db (init))
+  (let [cmds (let [price-levels (unrwap-price-levels doc)]
+               [{:insert-into [:price_levels]
+                 :values      (vals price-levels)}
+                {:insert-into [:order_books]
+                 :values [(reduce-kv (fn [m k v] (assoc m k (:id v)))
+                                     {:id (random-uuid) :timestamp (now) :last_update_id (:lastUpdateId doc)}
+                                     price-levels)]}])]
     (doseq [cmd cmds]
       (jdbc/execute! @db (sql/format cmd)))))
 
