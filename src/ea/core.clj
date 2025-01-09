@@ -4,6 +4,8 @@
    [ea.ea :as ea]
    [ea.ds :as ds]))
 
+(set! *warn-on-reflection* true)
+
 (defn -main [& args]
   (ds/-main "btcusdt")
   #_(ea/-main args))

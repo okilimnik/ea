@@ -15,7 +15,7 @@
 (defn subscribe [streams callback]
   (when-not @ws-client
     (reset! ws-client (WebSocketStreamClientImpl.)))
-  (.combineStreams @ws-client (ArrayList. streams) callback))
+  (.combineStreams @ws-client (into (ArrayList.) streams) callback))
 
 (defn unsubscribe [stream]
   (when-not @ws-client
