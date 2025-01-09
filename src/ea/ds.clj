@@ -17,8 +17,10 @@
      (recur))))
 
 (defn start-prices-stream! [symbol!]
-  (let [depth-stream (str symbol! "@depth5")]
-    (binance/subscribe (ArrayList. (List/of depth-stream))
+  (let [depth-stream (str symbol! "@depth5")
+        ;; otherwise it causes problems in native build
+        streams (ArrayList. (List/of depth-stream))]
+    (binance/subscribe streams
                        (reify WebSocketMessageCallback
                          ^void (onMessage [_ event-str]
                                           (try
