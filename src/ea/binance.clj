@@ -1,7 +1,6 @@
 (ns ea.binance
   (:require [jsonista.core :as j])
-  (:import [com.binance.connector.client.impl SpotClientImpl WebSocketStreamClientImpl]
-           [java.util ArrayList]))
+  (:import [com.binance.connector.client.impl SpotClientImpl WebSocketStreamClientImpl]))
 
 (def trade-client (atom nil))
 (def market-client (atom nil))
@@ -15,7 +14,7 @@
 (defn subscribe [streams callback]
   (when-not @ws-client
     (reset! ws-client (WebSocketStreamClientImpl.)))
-  (.combineStreams @ws-client (ArrayList. streams) callback))
+  (.combineStreams @ws-client streams callback))
 
 (defn unsubscribe [stream]
   (when-not @ws-client
