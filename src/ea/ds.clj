@@ -1,7 +1,7 @@
 (ns ea.ds
   (:require
    [clojure.java.io :as io]
-   [ea.async :refer [vthread]]
+   [ea.async :refer [thread]]
    [ea.binance :as binance :refer [jread]]
    [ea.db :as db]
    [ea.gcloud :as gcloud])
@@ -9,11 +9,11 @@
    [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]))
 
 (defn start-file-uploader! []
-  (vthread
-   (loop []
-     (Thread/sleep (* 1000 60 60))
-     (gcloud/upload-file! (io/file db/file))
-     (recur))))
+  (thread
+    (loop []
+      (Thread/sleep (* 1000 60 60))
+      (gcloud/upload-file! (io/file db/file))
+      (recur))))
 
 (defn start-prices-stream! [symbol!]
   (let [depth-stream (str symbol! "@depth5")]
