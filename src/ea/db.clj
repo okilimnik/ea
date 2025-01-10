@@ -3,4 +3,4 @@
 (def file "btcusdt.db")
 
 (defn insert! [doc]
-  (spit file (prn-str doc) :append true))
+  (spit file (str (prn-str doc) "\n") :append true))
