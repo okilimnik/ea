@@ -6,8 +6,7 @@
    [ea.db :as db]
    [ea.gcloud :as gcloud])
   (:import
-   [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]
-   [java.util ArrayList List]))
+   [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]))
 
 (defn start-file-uploader! []
   (vthread
@@ -18,7 +17,7 @@
 
 (defn start-prices-stream! [symbol!]
   (let [depth-stream (str symbol! "@depth5")]
-    (binance/subscribe (ArrayList. (List/of depth-stream))
+    (binance/subscribe [depth-stream]
                        (reify WebSocketMessageCallback
                          ^void (onMessage [_ event-str]
                                           (try
