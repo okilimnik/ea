@@ -1,15 +1,19 @@
 (ns ea.ea
   (:require
-   [ea.binance :as binance :refer [jread]]
+   [clojure.edn :as edn]
+   [clojure.java.io :as io]
    [ea.interop :refer [as-function]]
    [java-time.api :as jt])
   (:import
-   [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]
    [io.jenetics Genotype LongChromosome LongGene]
    [io.jenetics.engine Engine EvolutionResult]
    [io.jenetics.util BatchExecutor]))
 
-(def SYMBOL "btcusdt")
+(def prices-queue
+  (atom clojure.lang.PersistentQueue/EMPTY))
+
+(def price-changes (atom {}))
+
 (def POPULATION-SIZE 1000)
 (def GENERATIONS 100)
 (def TIMEFRAME->GENE
@@ -25,18 +29,11 @@
 (def INITIAL-BALANCE 1000)
 (def PRICE-QUEUE-LENGTH 86400)
 
-(def prices-queue
-  (atom clojure.lang.PersistentQueue/EMPTY))
-
-(def price-changes (atom {}))
-
-(def algorithm-started? (atom false))
-
 (defn price-changes->reality [changes]
   (->> changes
        (#(select-keys % (keys TIMEFRAME->GENE)))
        (into [])
-       (map #(list ((first %) TIMEFRAME->GENE) (second %)))
+       (map #(list (get TIMEFRAME->GENE (first %)) (second %)))
        (sort-by first)))
 
 (defn wait-close-possibilty! [strategy stop-loss]
@@ -56,35 +53,52 @@
       (when (= strategy reality)
         price))))
 
+(defn get-price-change-percent [k prices]
+  (let [last-price (last prices)
+        first-price (nth prices (- PRICE-QUEUE-LENGTH k))]
+    (int (* 100 (/ (- last-price first-price)
+                   first-price)))))
+
 (defn simulate-intraday-trade! [strategy]
   (let [[buy-strategy sell-strategy] (vec strategy)
         start-time (jt/local-date-time)
-        end-time (jt/plus start-time (jt/days 1))
+        end-time (jt/plus start-time (jt/days 5))
+        current-time (atom (jt/local-date-time))
         order (atom nil)
         balance (atom INITIAL-BALANCE)
         number-of-trades (atom 0)
         stop-loss-interval 200]
-    (loop []
-      (when (jt/before? (jt/local-date-time) end-time)
-        (if @order
-          (let [stop-loss (- (:price @order) stop-loss-interval)
-                price (wait-close-possibilty! sell-strategy stop-loss)]
-            (when price
-              (swap! number-of-trades inc)
-              (swap! balance + (- price (:price @order)))
-              (reset! order nil)))
-          (let [price (wait-open-possibility! buy-strategy)]
-            (when price
-              (reset! order {:price price}))))
-        (Thread/sleep 1000)
-        (recur)))
+    (with-open [rdr (io/reader "btcusdt.db")]
+      (doseq [line (line-seq rdr)]
+        (let [data (edn/read-string line)]
+          (swap! prices-queue #(as-> % $
+                                 (conj $ (-> data :asks ffirst parse-double))
+                                 (if (> (count $) PRICE-QUEUE-LENGTH)
+                                   (pop $)
+                                   $)))
+          (swap! price-changes assoc :ask-price (-> data :asks ffirst parse-double))
+          (swap! price-changes assoc :bid-price (-> data :bids ffirst parse-double)))
+        (when (= (count @prices-queue) PRICE-QUEUE-LENGTH)
+          (doseq [k (keys TIMEFRAME->GENE)]
+            (let [price-change-percent (get-price-change-percent k @prices-queue)]
+              (swap! price-changes assoc k price-change-percent)))
+          (when (jt/before? @current-time end-time)
+            (if @order
+              (let [stop-loss (- (:price @order) stop-loss-interval)
+                    price (wait-close-possibilty! sell-strategy stop-loss)]
+                (when price
+                  (swap! number-of-trades inc)
+                  (swap! balance + (- price (:price @order)))
+                  (reset! order nil)))
+              (let [price (wait-open-possibility! buy-strategy)]
+                (when price
+                  (reset! order {:price price}))))))
+        (swap! current-time jt/plus (jt/seconds 1))))
     (when (> @number-of-trades 0)
       (Thread/sleep (* 100 (rand-int 10)))
       (println "balance left: " @balance)
       (println "number of trades: " @number-of-trades)
-      (println "strategy: " strategy)
-      (println "reality: " (->> @price-changes
-                                price-changes->reality)))
+      (println "strategy: " strategy))
     (long (+ (- @balance INITIAL-BALANCE) (if (zero? @number-of-trades)
                                             (- 1000)
                                             @number-of-trades)))))
@@ -106,12 +120,6 @@
 (def price-change-chromosome
   (LongGene/of (- PRICE-MAX-CHANGE) PRICE-MAX-CHANGE))
 
-(defn get-price-change-percent [k prices]
-  (let [last-price (last prices)
-        first-price (nth prices (- PRICE-QUEUE-LENGTH k))]
-    (int (* 100 (/ (- last-price first-price)
-                   first-price)))))
-
 (defn start-algorithm! []
   (let [gtf (Genotype/of (->> [(LongChromosome/of [timeframe-chromosome])
                                (LongChromosome/of [price-change-chromosome])]
@@ -127,30 +135,7 @@
                    (.collect (EvolutionResult/toBestGenotype)))]
     (println result)))
 
-(defn start-prices-stream! []
-  (let [depth-stream (str SYMBOL "@depth5")]
-    (binance/subscribe [depth-stream]
-                       (reify WebSocketMessageCallback
-                         ^void (onMessage [_ event-str]
-                                          (try
-                                            (let [event (jread event-str)
-                                                  data (:data event)]
-                                              (when (= (:stream event) depth-stream)
-                                                (swap! prices-queue #(as-> % $
-                                                                       (conj $ (-> data :asks ffirst parse-double))
-                                                                       (if (> (count $) PRICE-QUEUE-LENGTH)
-                                                                         (pop $)
-                                                                         $)))
-                                                (swap! price-changes assoc :ask-price (-> data :asks ffirst parse-double))
-                                                (swap! price-changes assoc :bid-price (-> data :bids ffirst parse-double))
-                                                (doseq [k (keys TIMEFRAME->GENE)]
-                                                  (let [price-change-percent (get-price-change-percent k @prices-queue)]
-                                                    (swap! price-changes assoc k price-change-percent)))
-                                                (when (and (not @algorithm-started?) (= (count @prices-queue) PRICE-QUEUE-LENGTH)) ;; warmed-up
-                                                  (start-algorithm!))))
-                                            (catch Exception e (prn e))))))))
-
 (defn -main [& args]
-  (start-prices-stream!))
+  (start-algorithm!))
 
 ;; clj -M -m ea.ea
