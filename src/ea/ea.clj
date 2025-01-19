@@ -62,7 +62,7 @@
 (defn simulate-intraday-trade! [strategy]
   (let [[buy-strategy sell-strategy] (vec strategy)
         start-time (jt/local-date-time)
-        end-time (jt/plus start-time (jt/days 1))
+        end-time (jt/plus start-time (jt/days 5))
         current-time (atom (jt/local-date-time))
         order (atom nil)
         balance (atom INITIAL-BALANCE)
