@@ -1,6 +1,7 @@
 (ns ea.core
   (:gen-class)
   (:require
+   [clojure.java.io :as io]
    [clojure.tools.cli :refer [parse-opts]]
    [ea.db :as db]
    [ea.ds :as ds]
@@ -17,14 +18,14 @@
 
 (defn -main [& args]
   (let [{:keys [options]} (parse-opts args cli-options)]
+    (when-not (.exists (io/file db/file))
+      (download-file! db/file))
     (cond
       (:dataset options) (do
                            (prn "collecting data")
-                           (download-file! db/file)
                            (ds/-main "btcusdt"))
       (:train options) (do
                          (prn "training")
-                         (download-file! db/file)
                          (ea/start-algorithm!))
       :else
       "do nothing"))

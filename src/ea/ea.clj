@@ -62,27 +62,27 @@
 (defn simulate-intraday-trade! [strategy]
   (let [[buy-strategy sell-strategy] (vec strategy)
         start-time (jt/local-date-time)
-        end-time (jt/plus start-time (jt/days 5))
+        end-time (jt/plus start-time (jt/days 1))
         current-time (atom (jt/local-date-time))
         order (atom nil)
         balance (atom INITIAL-BALANCE)
         number-of-trades (atom 0)
         stop-loss-interval 200]
     (with-open [rdr (io/reader "btcusdt.db")]
-      (doseq [line (line-seq rdr)]
-        (let [data (edn/read-string line)]
-          (swap! prices-queue #(as-> % $
-                                 (conj $ (-> data :asks ffirst parse-double))
-                                 (if (> (count $) PRICE-QUEUE-LENGTH)
-                                   (pop $)
-                                   $)))
-          (swap! price-changes assoc :ask-price (-> data :asks ffirst parse-double))
-          (swap! price-changes assoc :bid-price (-> data :bids ffirst parse-double)))
-        (when (= (count @prices-queue) PRICE-QUEUE-LENGTH)
-          (doseq [k (keys TIMEFRAME->GENE)]
-            (let [price-change-percent (get-price-change-percent k @prices-queue)]
-              (swap! price-changes assoc k price-change-percent)))
-          (when (jt/before? @current-time end-time)
+      (loop [lines (line-seq rdr)]
+        (when (jt/before? @current-time end-time)
+          (let [data (edn/read-string (first lines))]
+            (swap! prices-queue #(as-> % $
+                                   (conj $ (-> data :asks ffirst parse-double))
+                                   (if (> (count $) PRICE-QUEUE-LENGTH)
+                                     (pop $)
+                                     $)))
+            (swap! price-changes assoc :ask-price (-> data :asks ffirst parse-double))
+            (swap! price-changes assoc :bid-price (-> data :bids ffirst parse-double)))
+          (when (= (count @prices-queue) PRICE-QUEUE-LENGTH)
+            (doseq [k (keys TIMEFRAME->GENE)]
+              (let [price-change-percent (get-price-change-percent k @prices-queue)]
+                (swap! price-changes assoc k price-change-percent)))
             (if @order
               (let [stop-loss (- (:price @order) stop-loss-interval)
                     price (wait-close-possibilty! sell-strategy stop-loss)]
@@ -92,13 +92,15 @@
                   (reset! order nil)))
               (let [price (wait-open-possibility! buy-strategy)]
                 (when price
-                  (reset! order {:price price}))))))
-        (swap! current-time jt/plus (jt/seconds 1))))
-    (when (> @number-of-trades 0)
-      (Thread/sleep (* 100 (rand-int 10)))
-      (println "balance left: " @balance)
-      (println "number of trades: " @number-of-trades)
-      (println "strategy: " strategy))
+                  (reset! order {:price price})))))
+          (swap! current-time jt/plus (jt/seconds 1))
+          (recur (rest lines)))))
+    (Thread/sleep (* 100 (rand-int 1000)))
+    (println "balance left: " @balance)
+    (println "number of trades: " @number-of-trades)
+    (println "strategy: " strategy)
+    (println "reality: " (->> @price-changes
+                              price-changes->reality))
     (long (+ (- @balance INITIAL-BALANCE) (if (zero? @number-of-trades)
                                             (- 1000)
                                             @number-of-trades)))))
