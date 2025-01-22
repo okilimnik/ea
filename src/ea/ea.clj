@@ -10,6 +10,7 @@
    [io.jenetics.engine Engine EvolutionResult]
    [java.util.concurrent Executors ThreadPoolExecutor]))
 
+(def CONCURRENCY 4)
 (def DATASET-LENGTH-IN-HOURS (* 24 5))
 (def DATASET-PRECISION-IN-SEC 60)
 (def POPULATION-SIZE 10)
@@ -25,7 +26,8 @@
 (def STRATEGY-COMPLEXITY (count (keys TIMEFRAME->GENE)))
 (def PRICE-MAX-CHANGE 5)
 (def INITIAL-BALANCE 1000)
-(def PRICE-QUEUE-LENGTH (apply max (keys TIMEFRAME->GENE)))
+(defn PRICE-QUEUE-LENGTH []
+  (/ (apply max (keys TIMEFRAME->GENE)) DATASET-PRECISION-IN-SEC))
 
 (defn price-changes->reality [changes]
   (->> changes
@@ -51,9 +53,9 @@
       (when (= strategy reality)
         price))))
 
-(defn get-price-change-percent [k prices]
+(defn get-price-change-percent [k prices price-queue-length]
   (let [last-price (last prices)
-        first-price (nth prices (- PRICE-QUEUE-LENGTH k))]
+        first-price (nth prices (- price-queue-length (/ k DATASET-PRECISION-IN-SEC)))]
     (int (* 100 (/ (- last-price first-price)
                    first-price)))))
 
@@ -67,21 +69,22 @@
         number-of-trades (atom 0)
         stop-loss-interval 200
         prices-queue (atom clojure.lang.PersistentQueue/EMPTY)
-        price-changes (atom {})]
+        price-changes (atom {})
+        price-queue-length (PRICE-QUEUE-LENGTH)]
     (loop [lines dataset]
       (let [data (edn/read-string (first lines))
             ready? (jt/after? @current-time end-time)]
         (when (and data (not ready?))
           (swap! prices-queue #(as-> % $
                                  (conj $ (-> data :asks ffirst parse-double))
-                                 (if (> (count $) PRICE-QUEUE-LENGTH)
+                                 (if (> (count $) price-queue-length)
                                    (pop $)
                                    $)))
-          (when (= (count @prices-queue) PRICE-QUEUE-LENGTH)
+          (when (= (count @prices-queue) price-queue-length)
             (swap! price-changes assoc :ask-price (-> data :asks ffirst parse-double))
             (swap! price-changes assoc :bid-price (-> data :bids ffirst parse-double))
             (doseq [k (keys TIMEFRAME->GENE)]
-              (let [price-change-percent (get-price-change-percent k @prices-queue)]
+              (let [price-change-percent (get-price-change-percent k @prices-queue price-queue-length)]
                 (swap! price-changes assoc k (cond
                                                (pos? price-change-percent)
                                                (min PRICE-MAX-CHANGE price-change-percent)
@@ -100,7 +103,7 @@
                   (reset! order {:price price})))))
           (swap! current-time jt/plus (jt/seconds DATASET-PRECISION-IN-SEC))
           (recur (drop DATASET-PRECISION-IN-SEC lines)))))
-    (Thread/sleep (* 300 (rand-int POPULATION-SIZE)))
+    (Thread/sleep (* 300 (rand-int CONCURRENCY)))
     (println "balance left: " @balance)
     (println "number of trades: " @number-of-trades)
     (println "strategy: " strategy)
@@ -130,7 +133,7 @@
 (defn start-algorithm! []
   (with-open [rdr (io/reader db/file)]
     (let [dataset (line-seq rdr)
-          ^ThreadPoolExecutor executor (Executors/newFixedThreadPool 2)
+          ^ThreadPoolExecutor executor (Executors/newFixedThreadPool CONCURRENCY)
           gtf (Genotype/of (->> [(LongChromosome/of [(timeframe-chromosome)])
                                  (LongChromosome/of [(price-change-chromosome)])]
                                 (repeat (* 2 STRATEGY-COMPLEXITY)) ;; 1 strategy to buy and 1 strategy to sell
