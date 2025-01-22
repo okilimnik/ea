@@ -8,7 +8,7 @@
   (:import
    [io.jenetics Genotype LongChromosome LongGene]
    [io.jenetics.engine Engine EvolutionResult]
-   [io.jenetics.util BatchExecutor]))
+   [java.util.concurrent Executors ThreadPoolExecutor]))
 
 (def DATASET-LENGTH-IN-HOURS (* 24 5))
 (def DATASET-PRECISION-IN-SEC 1)
@@ -130,13 +130,14 @@
 (defn start-algorithm! []
   (with-open [rdr (io/reader db/file)]
     (let [dataset (line-seq rdr)
+          ^ThreadPoolExecutor executor (Executors/newFixedThreadPool 2)
           gtf (Genotype/of (->> [(LongChromosome/of [(timeframe-chromosome)])
                                  (LongChromosome/of [(price-change-chromosome)])]
                                 (repeat (* 2 STRATEGY-COMPLEXITY)) ;; 1 strategy to buy and 1 strategy to sell
                                 (mapcat identity)))
           engine (-> (Engine/builder (as-function (partial eval! dataset)) gtf)
                      (.populationSize POPULATION-SIZE)
-                     (.fitnessExecutor (BatchExecutor/ofVirtualThreads))
+                     (.executor executor)
                      (.build))
           result (-> engine
                      (.stream)
