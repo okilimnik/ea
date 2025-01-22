@@ -12,7 +12,7 @@
 
 (def DATASET-LENGTH-IN-HOURS (* 24 5))
 (def DATASET-PRECISION-IN-SEC 1)
-(def POPULATION-SIZE 1000)
+(def POPULATION-SIZE 50)
 (def GENERATIONS 100)
 (def TIMEFRAME->GENE
   {300 0 ;; 5min
@@ -23,7 +23,7 @@
    86400 5 ;; 1d
    })
 (def STRATEGY-COMPLEXITY (count (keys TIMEFRAME->GENE)))
-(def PRICE-MAX-CHANGE 20)
+(def PRICE-MAX-CHANGE 5)
 (def INITIAL-BALANCE 1000)
 (def PRICE-QUEUE-LENGTH (apply max (keys TIMEFRAME->GENE)))
 
@@ -82,7 +82,12 @@
             (swap! price-changes assoc :bid-price (-> data :bids ffirst parse-double))
             (doseq [k (keys TIMEFRAME->GENE)]
               (let [price-change-percent (get-price-change-percent k @prices-queue)]
-                (swap! price-changes assoc k price-change-percent)))
+                (swap! price-changes assoc k (cond
+                                               (pos? price-change-percent)
+                                               (min PRICE-MAX-CHANGE price-change-percent)
+                                               (neg? price-change-percent)
+                                               (max (- PRICE-MAX-CHANGE) price-change-percent)
+                                               :else 0))))
             (if @order
               (let [stop-loss (- (:price @order) stop-loss-interval)
                     price (wait-close-possibilty! @price-changes sell-strategy stop-loss)]
