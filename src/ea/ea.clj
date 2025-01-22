@@ -11,7 +11,7 @@
    [java.util.concurrent Executors ThreadPoolExecutor]))
 
 (def DATASET-LENGTH-IN-HOURS (* 24 5))
-(def DATASET-PRECISION-IN-SEC 1)
+(def DATASET-PRECISION-IN-SEC 60)
 (def POPULATION-SIZE 10)
 (def GENERATIONS 100)
 (def TIMEFRAME->GENE
@@ -99,7 +99,7 @@
                 (when price
                   (reset! order {:price price})))))
           (swap! current-time jt/plus (jt/seconds DATASET-PRECISION-IN-SEC))
-          (recur (rest lines)))))
+          (recur (drop DATASET-PRECISION-IN-SEC lines)))))
     (Thread/sleep (* 300 (rand-int POPULATION-SIZE)))
     (println "balance left: " @balance)
     (println "number of trades: " @number-of-trades)
