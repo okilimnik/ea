@@ -10,7 +10,7 @@
    [io.jenetics.engine Engine EvolutionResult]
    [java.util.concurrent Executors ThreadPoolExecutor]))
 
-(def CONCURRENCY 4)
+(def CONCURRENCY 5)
 (def DATASET-LENGTH-IN-HOURS (* 24 5))
 (def DATASET-PRECISION-IN-SEC 60)
 (def POPULATION-SIZE 10)
@@ -103,12 +103,13 @@
                   (reset! order {:price price})))))
           (swap! current-time jt/plus (jt/seconds DATASET-PRECISION-IN-SEC))
           (recur (drop DATASET-PRECISION-IN-SEC lines)))))
-    (Thread/sleep (* 300 (rand-int CONCURRENCY)))
-    (println "balance left: " @balance)
-    (println "number of trades: " @number-of-trades)
-    (println "strategy: " strategy)
-    (println "reality: " (->> @price-changes
-                              price-changes->reality))
+    (when (> @number-of-trades 0)
+      (Thread/sleep (* 300 (rand-int CONCURRENCY)))
+      (println "balance left: " @balance)
+      (println "number of trades: " @number-of-trades)
+      (println "strategy: " strategy)
+      (println "reality: " (->> @price-changes
+                                price-changes->reality)))
     (long (+ (- @balance INITIAL-BALANCE) (if (zero? @number-of-trades)
                                             (- 1000)
                                             @number-of-trades)))))
