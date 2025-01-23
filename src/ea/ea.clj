@@ -36,13 +36,12 @@
        (map #(list (get TIMEFRAME->GENE (first %)) (second %)))
        (sort-by first)))
 
-(defn wait-close-possibilty! [price-changes strategy stop-loss]
+(defn wait-close-possibilty! [price-changes strategy]
   (when (seq price-changes)
     (let [reality (->> price-changes
                        price-changes->reality)
           price (:bid-price price-changes)]
-      (when (or (= strategy reality)
-                (<= price stop-loss))
+      (when (= strategy reality)
         price))))
 
 (defn wait-open-possibility! [price-changes strategy]
@@ -67,7 +66,6 @@
         order (atom nil)
         balance (atom INITIAL-BALANCE)
         number-of-trades (atom 0)
-        stop-loss-interval 200
         prices-queue (atom clojure.lang.PersistentQueue/EMPTY)
         price-changes (atom {})
         price-queue-length (PRICE-QUEUE-LENGTH)]
@@ -92,8 +90,7 @@
                                                (max (- PRICE-MAX-CHANGE) price-change-percent)
                                                :else 0))))
             (if @order
-              (let [stop-loss (- (:price @order) stop-loss-interval)
-                    price (wait-close-possibilty! @price-changes sell-strategy stop-loss)]
+              (let [price (wait-close-possibilty! @price-changes sell-strategy)]
                 (when price
                   (swap! number-of-trades inc)
                   (swap! balance + (- price (:price @order)))
