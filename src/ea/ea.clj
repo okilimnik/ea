@@ -10,11 +10,11 @@
    [io.jenetics.engine Engine EvolutionResult]
    [java.util.concurrent Executors ThreadPoolExecutor]))
 
-(def CONCURRENCY 5)
+(def CONCURRENCY 4)
 (def DATASET-LENGTH-IN-HOURS (* 24 5))
 (def DATASET-PRECISION-IN-SEC 60)
 (def POPULATION-SIZE 500)
-(def GENERATIONS 200)
+(def GENERATIONS 300)
 (def TIMEFRAME->GENE
   {300 0 ;; 5min
    900 1 ;; 15min
@@ -24,7 +24,7 @@
    86400 5 ;; 1d
    })
 (def STRATEGY-COMPLEXITY (count (keys TIMEFRAME->GENE)))
-(def PRICE-MAX-CHANGE 5)
+(def PRICE-MAX-CHANGE 10)
 (def INITIAL-BALANCE 1000)
 (defn PRICE-QUEUE-LENGTH []
   (/ (apply max (keys TIMEFRAME->GENE)) DATASET-PRECISION-IN-SEC))
