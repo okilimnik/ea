@@ -34,7 +34,9 @@
        (#(select-keys % (keys TIMEFRAME->GENE)))
        (into [])
        (map #(list (get TIMEFRAME->GENE (first %)) (second %)))
-       (sort-by first)))
+       (sort-by first)
+       (map second)
+       vec))
 
 (defn wait-close-possibilty! [price-changes strategy]
   (when (seq price-changes)
@@ -59,7 +61,10 @@
                    first-price)))))
 
 (defn simulate-intraday-trade! [strategy dataset]
-  (let [[buy-strategy sell-strategy] (vec strategy)
+  (let [strategy (first strategy)
+        [buy-strategy sell-strategy] (vec strategy)
+        buy-strategy (vec buy-strategy)
+        sell-strategy (vec sell-strategy)
         start-time (jt/local-date-time)
         end-time (jt/plus start-time (jt/hours DATASET-LENGTH-IN-HOURS))
         current-time (atom (jt/local-date-time))
@@ -103,7 +108,8 @@
     (Thread/sleep (* 300 (rand-int CONCURRENCY)))
     (println "balance left: " @balance)
     (println "number of trades: " @number-of-trades)
-    (println "strategy: " strategy)
+    (println "buy-strategy: " buy-strategy)
+    (println "sell-strategy: " sell-strategy)
     (println "reality: " (->> @price-changes
                               price-changes->reality))
     (long (+ (- @balance INITIAL-BALANCE) (if (zero? @number-of-trades)
@@ -120,10 +126,6 @@
                       (partition STRATEGY-COMPLEXITY))]
     (simulate-intraday-trade! strategy dataset)))
 
-(defn timeframe-chromosome []
-  (let [values (vals TIMEFRAME->GENE)]
-    (LongGene/of (apply min values) (inc (apply max values)))))
-
 (defn price-change-chromosome []
   (LongGene/of (- PRICE-MAX-CHANGE) PRICE-MAX-CHANGE))
 
@@ -131,10 +133,7 @@
   (with-open [rdr (io/reader db/file)]
     (let [dataset (line-seq rdr)
           ^ThreadPoolExecutor executor (Executors/newFixedThreadPool CONCURRENCY)
-          gtf (Genotype/of (->> [(LongChromosome/of [(timeframe-chromosome)])
-                                 (LongChromosome/of [(price-change-chromosome)])]
-                                (repeat (* 2 STRATEGY-COMPLEXITY)) ;; 1 strategy to buy and 1 strategy to sell
-                                (mapcat identity)))
+          gtf (Genotype/of (repeat (* 2 STRATEGY-COMPLEXITY) (LongChromosome/of [(price-change-chromosome)]))) ;; 1 strategy to buy and 1 strategy to sell             
           engine (-> (Engine/builder (as-function (partial eval! dataset)) gtf)
                      (.populationSize POPULATION-SIZE)
                      (.executor executor)
