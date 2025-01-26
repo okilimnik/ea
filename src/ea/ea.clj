@@ -63,8 +63,8 @@
 
 (defn simulate-intraday-trade! [strategy dataset]
   (let [[buy-strategy sell-strategy] strategy
-        buy-strategy (vec buy-strategy)
-        sell-strategy (vec sell-strategy)
+        buy-strategy buy-strategy
+        sell-strategy sell-strategy
         start-time (jt/local-date-time)
         end-time (jt/plus start-time (jt/hours DATASET-LENGTH-IN-HOURS))
         current-time (atom (jt/local-date-time))
@@ -124,7 +124,7 @@
                                  (.toArray)
                                  first))
                       (partition (STRATEGY-COMPLEXITY))
-                      vec)]
+                      (mapv vec))]
     (simulate-intraday-trade! strategy dataset)))
 
 (defn price-change-chromosome []
