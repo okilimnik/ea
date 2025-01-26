@@ -4,7 +4,7 @@ COPY . /app
 RUN clj -M -e "(compile 'ea.core)"
 RUN clj -M:uberjar --main-class ea.core
 
-FROM container-registry.oracle.com/graalvm/jdk:24
+FROM container-registry.oracle.com/graalvm/jdk:23
 RUN microdnf install freetype fontconfig
 COPY --from=lein /app/target/app.jar ./
 CMD ["java", "-jar", "app.jar", "-t"]
