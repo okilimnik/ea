@@ -15,6 +15,7 @@
 (def DATASET-PRECISION-IN-SEC 60)
 (def POPULATION-SIZE 500)
 (def GENERATIONS 200)
+(def PRICE-MAX-CHANGE 10)
 (def TIMEFRAME->GENE
   {300 0 ;; 5min
    900 1 ;; 15min
@@ -23,8 +24,8 @@
    14400 4 ;; 4h
    86400 5 ;; 1d
    })
-(def STRATEGY-COMPLEXITY (count (keys TIMEFRAME->GENE)))
-(def PRICE-MAX-CHANGE 10)
+(defn STRATEGY-COMPLEXITY []
+  (count (keys TIMEFRAME->GENE)))
 (def INITIAL-BALANCE 1000)
 (defn PRICE-QUEUE-LENGTH []
   (/ (apply max (keys TIMEFRAME->GENE)) DATASET-PRECISION-IN-SEC))
@@ -61,8 +62,7 @@
                    first-price)))))
 
 (defn simulate-intraday-trade! [strategy dataset]
-  (let [strategy (first strategy)
-        [buy-strategy sell-strategy] (vec strategy)
+  (let [[buy-strategy sell-strategy] strategy
         buy-strategy (vec buy-strategy)
         sell-strategy (vec sell-strategy)
         start-time (jt/local-date-time)
@@ -105,13 +105,14 @@
                   (reset! order {:price price})))))
           (swap! current-time jt/plus (jt/seconds DATASET-PRECISION-IN-SEC))
           (recur (drop DATASET-PRECISION-IN-SEC lines)))))
-    (Thread/sleep (* 300 (rand-int CONCURRENCY)))
-    (println "balance left: " @balance)
-    (println "number of trades: " @number-of-trades)
-    (println "buy-strategy: " buy-strategy)
-    (println "sell-strategy: " sell-strategy)
-    (println "reality: " (->> @price-changes
-                              price-changes->reality))
+    (when (> @number-of-trades 0)
+      (Thread/sleep (* 300 (rand-int CONCURRENCY)))
+      (println "balance left: " @balance)
+      (println "number of trades: " @number-of-trades)
+      (println "buy-strategy: " buy-strategy)
+      (println "sell-strategy: " sell-strategy)
+      (println "reality: " (->> @price-changes
+                                price-changes->reality)))
     (long (+ (- @balance INITIAL-BALANCE) (if (zero? @number-of-trades)
                                             (- 1000)
                                             @number-of-trades)))))
@@ -122,8 +123,8 @@
                                  (.as LongChromosome)
                                  (.toArray)
                                  first))
-                      (partition 2)
-                      (partition STRATEGY-COMPLEXITY))]
+                      (partition (STRATEGY-COMPLEXITY))
+                      vec)]
     (simulate-intraday-trade! strategy dataset)))
 
 (defn price-change-chromosome []
@@ -133,7 +134,7 @@
   (with-open [rdr (io/reader db/file)]
     (let [dataset (line-seq rdr)
           ^ThreadPoolExecutor executor (Executors/newFixedThreadPool CONCURRENCY)
-          gtf (Genotype/of (repeat (* 2 STRATEGY-COMPLEXITY) (LongChromosome/of [(price-change-chromosome)]))) ;; 1 strategy to buy and 1 strategy to sell             
+          gtf (Genotype/of (repeat (* 2 (STRATEGY-COMPLEXITY)) (LongChromosome/of [(price-change-chromosome)]))) ;; 1 strategy to buy and 1 strategy to sell             
           engine (-> (Engine/builder (as-function (partial eval! dataset)) gtf)
                      (.populationSize POPULATION-SIZE)
                      (.executor executor)

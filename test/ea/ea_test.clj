@@ -16,9 +16,9 @@
   (with-redefs [sut/POPULATION-SIZE 2
                 sut/GENERATIONS 2
                 sut/TIMEFRAME->GENE {300 0
-                                     900 1}
-                sut/STRATEGY-COMPLEXITY 2
-                sut/DATASET-LENGTH-IN-HOURS 1
+                                     900 1
+                                     1800 2}
+                sut/DATASET-LENGTH-IN-HOURS 24
                 db/file "test.db"]
     (sut/start-algorithm!)))
 
