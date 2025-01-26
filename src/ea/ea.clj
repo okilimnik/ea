@@ -11,10 +11,10 @@
    [java.util.concurrent Executors ThreadPoolExecutor]))
 
 (def CONCURRENCY 5)
-(def DATASET-LENGTH-IN-HOURS (* 24 3))
+(def DATASET-LENGTH-IN-HOURS (* 24 5))
 (def DATASET-PRECISION-IN-SEC 60)
-(def POPULATION-SIZE 50)
-(def GENERATIONS 100)
+(def POPULATION-SIZE 500)
+(def GENERATIONS 200)
 (def TIMEFRAME->GENE
   {300 0 ;; 5min
    900 1 ;; 15min
