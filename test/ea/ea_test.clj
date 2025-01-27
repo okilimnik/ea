@@ -13,11 +13,10 @@
       (recur (inc i) (rest data)))))
 
 (deftest algorithm-test
-  (with-redefs [sut/POPULATION-SIZE 2
-                sut/GENERATIONS 2
+  (with-redefs [sut/POPULATION-SIZE 10
+                sut/GENERATIONS 50
                 sut/TIMEFRAME->GENE {300 0
-                                     900 1
-                                     1800 2}
+                                     900 1}
                 sut/DATASET-LENGTH-IN-HOURS 24
                 db/file "test.db"]
     (sut/start-algorithm!)))

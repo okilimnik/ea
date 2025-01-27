@@ -14,9 +14,9 @@
 (def CONCURRENCY 5)
 (def DATASET-LENGTH-IN-HOURS (* 24 5))
 (def DATASET-PRECISION-IN-SEC 60)
-(def POPULATION-SIZE 500)
-(def GENERATIONS 200)
-(def PRICE-MAX-CHANGE 10)
+(def POPULATION-SIZE 50)
+(def GENERATIONS 100)
+(def PRICE-MIN-CHANGE 2) ;; means 0.2%
 (def TIMEFRAME->GENE
   {300 0 ;; 5min
    900 1 ;; 15min
@@ -30,6 +30,8 @@
 (def INITIAL-BALANCE 1000)
 (defn PRICE-QUEUE-LENGTH []
   (/ (apply max (keys TIMEFRAME->GENE)) DATASET-PRECISION-IN-SEC))
+(defn PRICE-MAX-CHANGE []
+  (* PRICE-MIN-CHANGE (STRATEGY-COMPLEXITY)))
 
 (defn price-changes->reality [changes]
   (->> changes
@@ -62,7 +64,7 @@
     (-> last-price
         (- first-price)
         (/ first-price)
-        (* 10000)
+        (* 1000)
         math/round)))
 
 (defn simulate-intraday-trade! [strategy dataset]
@@ -94,9 +96,9 @@
               (let [price-change-percent (get-price-change-percent k @prices-queue price-queue-length)]
                 (swap! price-changes assoc k (cond
                                                (pos? price-change-percent)
-                                               (min PRICE-MAX-CHANGE price-change-percent)
+                                               (min (PRICE-MAX-CHANGE) price-change-percent)
                                                (neg? price-change-percent)
-                                               (max (- PRICE-MAX-CHANGE) price-change-percent)
+                                               (max (- (PRICE-MAX-CHANGE)) price-change-percent)
                                                :else 0))))
             (if @order
               (let [price (wait-close-possibilty! @price-changes sell-strategy)]
@@ -133,7 +135,7 @@
 
 (defn price-change-genotype []
   (->> (for [i (range (STRATEGY-COMPLEXITY))
-             :let [change (* 20 (inc i))
+             :let [change (* PRICE-MIN-CHANGE (inc i))
                    gene (LongGene/of (- change) change)]]
          (LongChromosome/of [gene]))
        (repeat 2)
