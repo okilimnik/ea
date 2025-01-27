@@ -2,6 +2,7 @@
   (:require
    [clojure.edn :as edn]
    [clojure.java.io :as io]
+   [clojure.math :as math]
    [ea.db :as db]
    [ea.interop :refer [as-function]]
    [java-time.api :as jt])
@@ -58,8 +59,11 @@
 (defn get-price-change-percent [k prices price-queue-length]
   (let [last-price (last prices)
         first-price (nth prices (- price-queue-length (/ k DATASET-PRECISION-IN-SEC)))]
-    (int (* 100 (/ (- last-price first-price)
-                   first-price)))))
+    (-> last-price
+        (- first-price)
+        (/ first-price)
+        (* 10000)
+        math/round)))
 
 (defn simulate-intraday-trade! [strategy dataset]
   (let [[buy-strategy sell-strategy] strategy
@@ -127,15 +131,20 @@
                       (mapv vec))]
     (simulate-intraday-trade! strategy dataset)))
 
-(defn price-change-chromosome []
-  (LongGene/of (- PRICE-MAX-CHANGE) PRICE-MAX-CHANGE))
+(defn price-change-genotype []
+  (->> (for [i (range (STRATEGY-COMPLEXITY))
+             :let [change (* 20 (inc i))
+                   gene (LongGene/of (- change) change)]]
+         (LongChromosome/of [gene]))
+       (repeat 2)
+       (mapcat identity)
+       Genotype/of))
 
 (defn start-algorithm! []
   (with-open [rdr (io/reader db/file)]
     (let [dataset (line-seq rdr)
           ^ThreadPoolExecutor executor (Executors/newFixedThreadPool CONCURRENCY)
-          gtf (Genotype/of (repeat (* 2 (STRATEGY-COMPLEXITY)) (LongChromosome/of [(price-change-chromosome)]))) ;; 1 strategy to buy and 1 strategy to sell             
-          engine (-> (Engine/builder (as-function (partial eval! dataset)) gtf)
+          engine (-> (Engine/builder (as-function (partial eval! dataset)) (price-change-genotype))
                      (.populationSize POPULATION-SIZE)
                      (.executor executor)
                      (.build))
