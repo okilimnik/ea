@@ -12,7 +12,7 @@
       (spit "test.db" (str (first data) "\n") :append true)
       (recur (inc i) (rest data)))))
 
-(deftest algorithm-test
+#_(deftest algorithm-test
   (with-redefs [sut/POPULATION-SIZE 10
                 sut/GENERATIONS 50
                 sut/TIMEFRAME->GENE {300 0

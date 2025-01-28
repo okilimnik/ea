@@ -12,10 +12,10 @@
    [java.util.concurrent Executors ThreadPoolExecutor]))
 
 (def CONCURRENCY 5)
-(def DATASET-LENGTH-IN-HOURS (* 24 5))
+(def DATASET-LENGTH-IN-HOURS (* 24 5)) ;; 14 days available
 (def DATASET-PRECISION-IN-SEC 60)
 (def POPULATION-SIZE 500)
-(def GENERATIONS 200)
+(def GENERATIONS 1000)
 (def PRICE-MIN-CHANGE 2) ;; means 0.2%
 (def TIMEFRAME->GENE
   {300 0 ;; 5min
@@ -111,14 +111,15 @@
                   (reset! order {:price price})))))
           (swap! current-time jt/plus (jt/seconds DATASET-PRECISION-IN-SEC))
           (recur (drop DATASET-PRECISION-IN-SEC lines)))))
-    (when (> @number-of-trades 0)
-      (Thread/sleep (* 300 (rand-int CONCURRENCY)))
-      (println "balance left: " @balance)
-      (println "number of trades: " @number-of-trades)
-      (println "buy-strategy: " buy-strategy)
-      (println "sell-strategy: " sell-strategy)
-      (println "reality: " (->> @price-changes
-                                price-changes->reality)))
+    ;(when (> @number-of-trades 0)
+    (Thread/sleep (* 300 (rand-int CONCURRENCY)))
+    (println "balance left: " @balance)
+    (println "number of trades: " @number-of-trades)
+    (println "buy-strategy: " buy-strategy)
+    (println "sell-strategy: " sell-strategy)
+    (println "reality: " (->> @price-changes
+                              price-changes->reality))
+                                ;)
     (long (+ (- @balance INITIAL-BALANCE) (if (zero? @number-of-trades)
                                             (- 1000)
                                             @number-of-trades)))))
