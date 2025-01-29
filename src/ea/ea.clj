@@ -31,8 +31,8 @@
 (def INITIAL-BALANCE 1000)
 (defn PRICE-QUEUE-LENGTH []
   (/ (apply max (keys TIMEFRAME->GENE)) DATASET-PRECISION-IN-SEC))
-(defn PRICE-MAX-CHANGE []
-  (* PRICE-MIN-CHANGE (STRATEGY-COMPLEXITY)))
+(defn PRICE-MAX-CHANGE [k]
+  (+ PRICE-MIN-CHANGE (get TIMEFRAME->GENE k)))
 
 (defn price-changes->reality [changes]
   (->> changes
@@ -81,12 +81,12 @@
         prices-queue (atom clojure.lang.PersistentQueue/EMPTY)
         price-changes (atom {})
         price-queue-length (PRICE-QUEUE-LENGTH)
-        reality-ranges (atom {300 {:min 0 :max 0}
-                              900 {:min 0 :max 0}
-                              1800 {:min 0 :max 0}
-                              3600 {:min 0 :max 0}
-                              14400 {:min 0 :max 0}
-                              86400 {:min 0 :max 0}})]
+        #_reality-ranges #_(atom {300 {:min 0 :max 0}
+                                  900 {:min 0 :max 0}
+                                  1800 {:min 0 :max 0}
+                                  3600 {:min 0 :max 0}
+                                  14400 {:min 0 :max 0}
+                                  86400 {:min 0 :max 0}})]
     (loop [lines dataset]
       (let [data (edn/read-string (first lines))
             ready? (jt/after? @current-time end-time)]
@@ -103,9 +103,9 @@
               (let [price-change-percent (get-price-change-percent k @prices-queue price-queue-length)]
                 (swap! price-changes assoc k (cond
                                                (pos? price-change-percent)
-                                               (min (PRICE-MAX-CHANGE) price-change-percent)
+                                               (min (PRICE-MAX-CHANGE k) price-change-percent)
                                                (neg? price-change-percent)
-                                               (max (- (PRICE-MAX-CHANGE)) price-change-percent)
+                                               (max (- (PRICE-MAX-CHANGE k)) price-change-percent)
                                                :else 0))))
             #_(let [reality (price-changes->reality @price-changes)]
                 (swap! reality-ranges (fn [ranges]
@@ -135,8 +135,9 @@
       (println "balance left: " @balance)
       (println "number of trades: " @number-of-trades)
       (println "buy-strategy: " buy-strategy)
-      (println "sell-strategy: " sell-strategy))
-    
+      (println "sell-strategy: " sell-strategy)
+      (println "reality: " (price-changes->reality @price-changes)))
+
     (long (+ (- @balance INITIAL-BALANCE) (if (zero? @number-of-trades)
                                             (- 1000)
                                             @number-of-trades)))))
@@ -152,10 +153,12 @@
     (simulate-intraday-trade! strategy dataset)))
 
 (defn price-change-genotype []
-  (->> (for [i (range (STRATEGY-COMPLEXITY))
-             :let [change (* PRICE-MIN-CHANGE (inc i))
-                   gene (LongGene/of (- change) change)]]
-         (LongChromosome/of [gene]))
+  (->> [(LongChromosome/of [(LongGene/of -5 5)])
+        (LongChromosome/of [(LongGene/of -5 5)])
+        (LongChromosome/of [(LongGene/of -7 7)])
+        (LongChromosome/of [(LongGene/of -7 7)])
+        (LongChromosome/of [(LongGene/of -9 9)])
+        (LongChromosome/of [(LongGene/of -9 9)])]
        (repeat 2)
        (mapcat identity)
        Genotype/of))

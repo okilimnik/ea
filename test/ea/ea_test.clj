@@ -12,18 +12,19 @@
       (spit "test.db" (str (first data) "\n") :append true)
       (recur (inc i) (rest data)))))
 
-(deftest ranges-test
+#_(deftest ranges-test
   (with-redefs [sut/POPULATION-SIZE 1
                 sut/GENERATIONS 1
                 sut/CONCURRENCY 1]
     (sut/start-algorithm!)))
 
-#_(deftest algorithm-test
+(deftest algorithm-test
   (with-redefs [sut/POPULATION-SIZE 10
                 sut/GENERATIONS 50
                 sut/TIMEFRAME->GENE {300 0
                                      900 1}
                 sut/DATASET-LENGTH-IN-HOURS 24
+                sut/CONCURRENCY 1
                 db/file "test.db"]
     (sut/start-algorithm!)))
 
