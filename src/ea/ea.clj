@@ -139,7 +139,7 @@
       (println "reality: " (price-changes->reality @price-changes)))
 
     (long (+ (- @balance INITIAL-BALANCE) (if (zero? @number-of-trades)
-                                            (- 1000)
+                                            (- INITIAL-BALANCE)
                                             @number-of-trades)))))
 
 (defn eval! [dataset gt]
