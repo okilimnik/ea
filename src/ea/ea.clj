@@ -3,6 +3,7 @@
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.math :as math]
+   [clojure.pprint :as pprint]
    [ea.db :as db]
    [ea.interop :refer [as-function]]
    [java-time.api :as jt])
@@ -12,11 +13,11 @@
    [java.util.concurrent Executors ThreadPoolExecutor]))
 
 (def CONCURRENCY 5)
-(def DATASET-LENGTH-IN-HOURS (* 24 5)) ;; 14 days available
+(def DATASET-LENGTH-IN-HOURS (* 24 14)) ;; 14 days available
 (def DATASET-PRECISION-IN-SEC 60)
 (def POPULATION-SIZE 500)
 (def GENERATIONS 1000)
-(def PRICE-MIN-CHANGE 5) ;; means 0.2%
+(def PRICE-MIN-CHANGE 5) ;; means 5%
 (def TIMEFRAME->GENE
   {300 0 ;; 5min
    900 1 ;; 15min
@@ -64,7 +65,7 @@
     (-> last-price
         (- first-price)
         (/ first-price)
-        (* 1000)
+        (* 100)
         math/round)))
 
 (defn simulate-intraday-trade! [strategy dataset]
@@ -79,7 +80,13 @@
         number-of-trades (atom 0)
         prices-queue (atom clojure.lang.PersistentQueue/EMPTY)
         price-changes (atom {})
-        price-queue-length (PRICE-QUEUE-LENGTH)]
+        price-queue-length (PRICE-QUEUE-LENGTH)
+        reality-ranges (atom {300 {:min 0 :max 0}
+                              900 {:min 0 :max 0}
+                              1800 {:min 0 :max 0}
+                              3600 {:min 0 :max 0}
+                              14400 {:min 0 :max 0}
+                              86400 {:min 0 :max 0}})]
     (loop [lines dataset]
       (let [data (edn/read-string (first lines))
             ready? (jt/after? @current-time end-time)]
@@ -100,6 +107,18 @@
                                                (neg? price-change-percent)
                                                (max (- (PRICE-MAX-CHANGE)) price-change-percent)
                                                :else 0))))
+            #_(let [reality (price-changes->reality @price-changes)]
+                (swap! reality-ranges (fn [ranges]
+                                        (reduce-kv (fn [m k v]
+                                                     (let [rv (nth reality (get TIMEFRAME->GENE k))]
+                                                       (cond
+                                                         (< rv (:min v))
+                                                         (assoc-in m [k :min] rv)
+                                                         (> rv (:max v))
+                                                         (assoc-in m [k :max] rv)
+                                                         :else
+                                                         m))) ranges ranges)))
+                (spit "./reality.edn" (with-out-str (pprint/pprint @reality-ranges))))
             (if @order
               (let [price (wait-close-possibilty! @price-changes sell-strategy)]
                 (when price
@@ -117,8 +136,7 @@
       (println "number of trades: " @number-of-trades)
       (println "buy-strategy: " buy-strategy)
       (println "sell-strategy: " sell-strategy))
-    #_(spit "./reality.txt" (prn-str (->> @price-changes
-                                          price-changes->reality)) :append true)
+    
     (long (+ (- @balance INITIAL-BALANCE) (if (zero? @number-of-trades)
                                             (- 1000)
                                             @number-of-trades)))))
