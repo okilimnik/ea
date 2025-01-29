@@ -153,12 +153,10 @@
     (simulate-intraday-trade! strategy dataset)))
 
 (defn price-change-genotype []
-  (->> [(LongChromosome/of [(LongGene/of -5 5)])
-        (LongChromosome/of [(LongGene/of -5 5)])
-        (LongChromosome/of [(LongGene/of -7 7)])
-        (LongChromosome/of [(LongGene/of -7 7)])
-        (LongChromosome/of [(LongGene/of -9 9)])
-        (LongChromosome/of [(LongGene/of -9 9)])]
+  (->> (for [k (sort (keys TIMEFRAME->GENE))
+             :let [change (PRICE-MAX-CHANGE k)
+                   gene (LongGene/of (- change) change)]]
+         (LongChromosome/of [gene]))
        (repeat 2)
        (mapcat identity)
        Genotype/of))

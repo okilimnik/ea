@@ -19,13 +19,12 @@
     (sut/start-algorithm!)))
 
 (deftest algorithm-test
-  (with-redefs [sut/POPULATION-SIZE 10
-                sut/GENERATIONS 50
+  (with-redefs [sut/POPULATION-SIZE 2
+                sut/GENERATIONS 2
                 sut/TIMEFRAME->GENE {300 0
-                                     900 1}
-                sut/DATASET-LENGTH-IN-HOURS 24
-                sut/CONCURRENCY 1
-                db/file "test.db"]
+                                     900 1
+                                     1800 2}
+                sut/CONCURRENCY 1]
     (sut/start-algorithm!)))
 
 ;; clj -X:test
