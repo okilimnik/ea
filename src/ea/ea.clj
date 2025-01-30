@@ -121,12 +121,14 @@
                 (spit "./reality.edn" (with-out-str (pprint/pprint @reality-ranges))))
             (let [price (wait-close-possibilty! @price-changes sell-strategy)]
               (when price
-                (swap! number-of-trades inc)
+                (if @order
+                  (swap! number-of-trades + 1.5)
+                  (swap! number-of-trades + 0.5))
                 (swap! balance + (- price (or (:price @order) price)))
                 (reset! order nil)))
             (let [price (wait-open-possibility! @price-changes buy-strategy)]
               (when price
-                (swap! number-of-trades inc)
+                (swap! number-of-trades + 0.5)
                 (reset! order {:price price}))))
           (swap! current-time jt/plus (jt/seconds DATASET-PRECISION-IN-SEC))
           (recur (drop DATASET-PRECISION-IN-SEC lines)))))
@@ -138,9 +140,7 @@
       (println "sell-strategy: " sell-strategy)
       (println "reality: " (price-changes->reality @price-changes)))
 
-    (long (+ (- @balance INITIAL-BALANCE) (if (zero? @number-of-trades)
-                                            (- INITIAL-BALANCE)
-                                            @number-of-trades)))))
+    (long (+ (- @balance INITIAL-BALANCE) @number-of-trades))))
 
 (defn eval! [dataset gt]
   (let [strategy (->> (range (.length gt))
