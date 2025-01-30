@@ -119,15 +119,15 @@
                                                          :else
                                                          m))) ranges ranges)))
                 (spit "./reality.edn" (with-out-str (pprint/pprint @reality-ranges))))
-            (if @order
-              (let [price (wait-close-possibilty! @price-changes sell-strategy)]
-                (when price
-                  (swap! balance + (- price (:price @order)))
-                  (reset! order nil)))
-              (let [price (wait-open-possibility! @price-changes buy-strategy)]
-                (when price
-                  (swap! number-of-trades inc)
-                  (reset! order {:price price})))))
+            (let [price (wait-close-possibilty! @price-changes sell-strategy)]
+              (when price
+                (swap! number-of-trades inc)
+                (swap! balance + (- price (or (:price @order) price)))
+                (reset! order nil)))
+            (let [price (wait-open-possibility! @price-changes buy-strategy)]
+              (when price
+                (swap! number-of-trades inc)
+                (reset! order {:price price}))))
           (swap! current-time jt/plus (jt/seconds DATASET-PRECISION-IN-SEC))
           (recur (drop DATASET-PRECISION-IN-SEC lines)))))
     (when (> @number-of-trades 0)
