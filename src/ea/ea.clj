@@ -17,28 +17,37 @@
 (def DATASET-PRECISION-IN-SEC 60)
 (def POPULATION-SIZE 500)
 (def GENERATIONS 1000)
-(def PRICE-MIN-CHANGE 5) ;; means 5%
 (def TIMEFRAME->GENE
-  {300 0 ;; 5min
-   900 1 ;; 15min
-   1800 2 ;; 30min
-   3600 3 ;; 1h
-   14400 4 ;; 4h
-   86400 5 ;; 1d
+  {300 {:index 0
+        :price-max-change 5
+        :price-change-divider 1} ;; 5min
+   900 {:index 1
+        :price-max-change 5
+        :price-change-divider 1} ;; 15min
+   1800 {:index 2
+         :price-max-change 7
+         :price-change-divider 1.5} ;; 30min
+   3600 {:index 3
+         :price-max-change 7
+         :price-change-divider 1.5} ;; 1h
+   14400 {:index 4
+          :price-max-change 9
+          :price-change-divider 2} ;; 4h
+   86400 {:index 5
+          :price-max-change 9
+          :price-change-divider 2} ;; 1d
    })
 (defn STRATEGY-COMPLEXITY []
   (count (keys TIMEFRAME->GENE)))
 (def INITIAL-BALANCE 1000)
 (defn PRICE-QUEUE-LENGTH []
   (/ (apply max (keys TIMEFRAME->GENE)) DATASET-PRECISION-IN-SEC))
-(defn PRICE-MAX-CHANGE [k]
-  (+ PRICE-MIN-CHANGE (get TIMEFRAME->GENE k)))
 
 (defn price-changes->reality [changes]
   (->> changes
        (#(select-keys % (keys TIMEFRAME->GENE)))
        (into [])
-       (map #(list (get TIMEFRAME->GENE (first %)) (second %)))
+       (map #(list (:index (get TIMEFRAME->GENE (first %))) (second %)))
        (sort-by first)
        (map second)
        vec))
@@ -65,8 +74,7 @@
     (-> last-price
         (- first-price)
         (/ first-price)
-        (* 100)
-        math/round)))
+        (* 100))))
 
 (defn simulate-intraday-trade! [strategy dataset]
   (let [[buy-strategy sell-strategy] strategy
@@ -101,16 +109,18 @@
             (swap! price-changes assoc :bid-price (-> data :bids ffirst parse-double))
             (doseq [k (keys TIMEFRAME->GENE)]
               (let [price-change-percent (get-price-change-percent k @prices-queue price-queue-length)]
-                (swap! price-changes assoc k (cond
-                                               (pos? price-change-percent)
-                                               (min (PRICE-MAX-CHANGE k) price-change-percent)
-                                               (neg? price-change-percent)
-                                               (max (- (PRICE-MAX-CHANGE k)) price-change-percent)
-                                               :else 0))))
+                (swap! price-changes assoc k (-> (cond
+                                                   (pos? price-change-percent)
+                                                   (min (:price-max-change (get TIMEFRAME->GENE k)) price-change-percent)
+                                                   (neg? price-change-percent)
+                                                   (max (- (:price-max-change (get TIMEFRAME->GENE k))) price-change-percent)
+                                                   :else 0)
+                                                 (/ (:price-change-divider (get TIMEFRAME->GENE k)))
+                                                 math/round))))
             #_(let [reality (price-changes->reality @price-changes)]
                 (swap! reality-ranges (fn [ranges]
                                         (reduce-kv (fn [m k v]
-                                                     (let [rv (nth reality (get TIMEFRAME->GENE k))]
+                                                     (let [rv (nth reality (:index (get TIMEFRAME->GENE k)))]
                                                        (cond
                                                          (< rv (:min v))
                                                          (assoc-in m [k :min] rv)
@@ -154,7 +164,9 @@
 
 (defn price-change-genotype []
   (->> (for [k (sort (keys TIMEFRAME->GENE))
-             :let [change (PRICE-MAX-CHANGE k)
+             :let [change (-> (:price-max-change (get TIMEFRAME->GENE k))
+                              (/ (:price-change-divider (get TIMEFRAME->GENE k)))
+                              math/round)
                    gene (LongGene/of (- change) change)]]
          (LongChromosome/of [gene]))
        (repeat 2)
