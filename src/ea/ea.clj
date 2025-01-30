@@ -122,13 +122,13 @@
             (let [price (wait-close-possibilty! @price-changes sell-strategy)]
               (when price
                 (if @order
-                  (swap! number-of-trades + 1.5)
-                  (swap! number-of-trades + 0.5))
+                  (swap! number-of-trades + 0.95)
+                  (swap! number-of-trades + 0.05))
                 (swap! balance + (- price (or (:price @order) price)))
                 (reset! order nil)))
             (let [price (wait-open-possibility! @price-changes buy-strategy)]
               (when price
-                (swap! number-of-trades + 0.5)
+                (swap! number-of-trades + 0.05)
                 (reset! order {:price price}))))
           (swap! current-time jt/plus (jt/seconds DATASET-PRECISION-IN-SEC))
           (recur (drop DATASET-PRECISION-IN-SEC lines)))))
