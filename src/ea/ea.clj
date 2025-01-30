@@ -77,7 +77,7 @@
         current-time (atom (jt/local-date-time))
         order (atom nil)
         balance (atom INITIAL-BALANCE)
-        number-of-trades (atom 0)
+        evaluation (atom 0)
         prices-queue (atom clojure.lang.PersistentQueue/EMPTY)
         price-changes (atom {})
         price-queue-length (PRICE-QUEUE-LENGTH)
@@ -122,25 +122,25 @@
             (let [price (wait-close-possibilty! @price-changes sell-strategy)]
               (when price
                 (if @order
-                  (swap! number-of-trades + 0.99)
-                  (swap! number-of-trades + 0.01))
+                  (swap! evaluation + 0.99)
+                  (swap! evaluation + 0.01))
                 (swap! balance + (- price (or (:price @order) price)))
                 (reset! order nil)))
             (let [price (wait-open-possibility! @price-changes buy-strategy)]
               (when price
-                (swap! number-of-trades + 0.01)
+                (swap! evaluation + 0.01)
                 (reset! order {:price price}))))
           (swap! current-time jt/plus (jt/seconds DATASET-PRECISION-IN-SEC))
           (recur (drop DATASET-PRECISION-IN-SEC lines)))))
-    (when (> @number-of-trades 0)
+    (when (> @balance INITIAL-BALANCE)
       (Thread/sleep (* 300 (rand-int CONCURRENCY)))
       (println "balance left: " @balance)
-      (println "number of trades: " @number-of-trades)
+      (println "evaluation: " @evaluation)
       (println "buy-strategy: " buy-strategy)
       (println "sell-strategy: " sell-strategy)
       (println "reality: " (price-changes->reality @price-changes)))
 
-    (long (+ (- @balance INITIAL-BALANCE) @number-of-trades))))
+    (long (+ (- @balance INITIAL-BALANCE) @evaluation))))
 
 (defn eval! [dataset gt]
   (let [strategy (->> (range (.length gt))
