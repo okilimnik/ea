@@ -12,7 +12,7 @@
    [io.jenetics.engine Engine EvolutionResult]
    [java.util.concurrent Executors ThreadPoolExecutor]))
 
-(def CONCURRENCY 5)
+(def CONCURRENCY 8)
 (def DATASET-LENGTH-IN-HOURS (* 24 14)) ;; 14 days available
 (def DATASET-PRECISION-IN-SEC 60)
 (def POPULATION-SIZE 500)
