@@ -41,8 +41,8 @@
   (count (keys TIMEFRAME->GENE)))
 (def INITIAL-BALANCE 1000)
 ;(def STOP-PROFIT 25)
-(def STOP-LOSS-1 12)
-(def STOP-LOSS-2 250)
+(def STOP-LOSS-1 0)
+(def STOP-LOSS-2 1000)
 (defn PRICE-QUEUE-LENGTH []
   (/ (apply max (keys TIMEFRAME->GENE)) DATASET-PRECISION-IN-SEC))
 
