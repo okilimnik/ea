@@ -40,6 +40,8 @@
 (defn STRATEGY-COMPLEXITY []
   (count (keys TIMEFRAME->GENE)))
 (def INITIAL-BALANCE 1000)
+(def STOP-PROFIT 25)
+(def STOP-LOSS 1000)
 (defn PRICE-QUEUE-LENGTH []
   (/ (apply max (keys TIMEFRAME->GENE)) DATASET-PRECISION-IN-SEC))
 
@@ -52,12 +54,15 @@
        (map second)
        vec))
 
-(defn wait-close-possibilty! [price-changes strategy]
+(defn wait-close-possibilty! [price-changes strategy order-price]
   (when (seq price-changes)
     (let [reality (->> price-changes
                        price-changes->reality)
           price (:bid-price price-changes)]
-      (when (= strategy reality)
+      (when (or (= strategy reality)
+                (and order-price
+                     (<= (+ order-price STOP-PROFIT) price)
+                     (>= (- order-price STOP-LOSS) price)))
         price))))
 
 (defn wait-open-possibility! [price-changes strategy]
@@ -88,6 +93,7 @@
         evaluation (atom 0)
         prices-queue (atom clojure.lang.PersistentQueue/EMPTY)
         price-changes (atom {})
+        number-of-trades (atom 0)
         price-queue-length (PRICE-QUEUE-LENGTH)
         #_reality-ranges #_(atom {300 {:min 0 :max 0}
                                   900 {:min 0 :max 0}
@@ -129,28 +135,35 @@
                                                          :else
                                                          m))) ranges ranges)))
                 (spit "./reality.edn" (with-out-str (pprint/pprint @reality-ranges))))
-            (let [price (wait-close-possibilty! @price-changes sell-strategy)]
+            (let [price (wait-close-possibilty! @price-changes sell-strategy (:price @order))]
               (when price
-                (if @order
-                  (swap! evaluation + 0.99)
-                  (swap! evaluation + 0.01))
-                (swap! balance + (- price (or (:price @order) price)))
-                (reset! order nil)))
+                (let [delta (- price (or (:price @order) price))]
+                  (if @order
+                    (do 
+                      (swap! number-of-trades inc)
+                      (swap! evaluation #(+ % (/ delta 100))))
+                    (swap! evaluation + 0.0001))
+                  (swap! balance + delta)
+                  (reset! order nil))))
             (let [price (wait-open-possibility! @price-changes buy-strategy)]
               (when price
-                (swap! evaluation + 0.01)
+                (swap! evaluation + 0.0001)
                 (reset! order {:price price}))))
           (swap! current-time jt/plus (jt/seconds DATASET-PRECISION-IN-SEC))
           (recur (drop DATASET-PRECISION-IN-SEC lines)))))
-    (when (> @balance INITIAL-BALANCE)
-      (Thread/sleep (* 300 (rand-int CONCURRENCY)))
-      (println "balance left: " @balance)
-      (println "evaluation: " @evaluation)
-      (println "buy-strategy: " buy-strategy)
-      (println "sell-strategy: " sell-strategy)
-      (println "reality: " (price-changes->reality @price-changes)))
+    ;; TODO: log to s3 bucket
+    ;; TODO: add stop loss
+    ;(when (> @balance INITIAL-BALANCE)
+    (Thread/sleep (* 300 (rand-int CONCURRENCY)))
+    (println "balance left: " @balance)
+    (println "number of trades: " @number-of-trades)
+    (println "evaluation: " @evaluation)
+    (println "buy-strategy: " buy-strategy)
+    (println "sell-strategy: " sell-strategy)
+    (println "reality: " (price-changes->reality @price-changes))
+      ;)
 
-    (long (+ (- @balance INITIAL-BALANCE) @evaluation))))
+    (float @evaluation)))
 
 (defn eval! [dataset gt]
   (let [strategy (->> (range (.length gt))

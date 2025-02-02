@@ -19,11 +19,14 @@
     (sut/start-algorithm!)))
 
 (deftest algorithm-test
-  (with-redefs [sut/POPULATION-SIZE 2
-                sut/GENERATIONS 2
-                sut/TIMEFRAME->GENE {300 0
-                                     900 1
-                                     1800 2}
+  (with-redefs [sut/POPULATION-SIZE 10
+                sut/GENERATIONS 100
+                sut/TIMEFRAME->GENE {300 {:index 0
+                                          :price-max-change 5
+                                          :price-change-divider 1}
+                                     900 {:index 1
+                                          :price-max-change 5
+                                          :price-change-divider 1}}
                 sut/CONCURRENCY 1]
     (sut/start-algorithm!)))
 
