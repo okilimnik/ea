@@ -139,3 +139,19 @@ number of trades:  30
 evaluation:  143.83180000000004
 buy-strategy:  [0 2]
 sell-strategy:  [0 2]
+
+stop-loss-1 12
+stop-loss-2 1000
+
+balance left:  423872.71000000363
+number of trades:  11270
+evaluation:  4230.5644000014645
+buy-strategy:  [0 0]
+
+stop-loss-1 12
+stop-loss-2 500
+
+balance left:  412835.8100000042
+number of trades:  11296
+evaluation:  4120.198900001451
+buy-strategy:  [0 0]

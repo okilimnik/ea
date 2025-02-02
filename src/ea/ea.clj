@@ -40,8 +40,9 @@
 (defn STRATEGY-COMPLEXITY []
   (count (keys TIMEFRAME->GENE)))
 (def INITIAL-BALANCE 1000)
-(def STOP-PROFIT 25)
-(def STOP-LOSS 1000)
+;(def STOP-PROFIT 25)
+(def STOP-LOSS-1 12)
+(def STOP-LOSS-2 250)
 (defn PRICE-QUEUE-LENGTH []
   (/ (apply max (keys TIMEFRAME->GENE)) DATASET-PRECISION-IN-SEC))
 
@@ -61,8 +62,9 @@
           price (:bid-price price-changes)]
       (when (or (= strategy reality)
                 (and order-price
-                     (<= (+ order-price STOP-PROFIT) price)
-                     (>= (- order-price STOP-LOSS) price)))
+                     ;(<= (+ order-price STOP-PROFIT) price)
+                     (or (<= (- order-price STOP-LOSS-1) price)
+                         (>= (- order-price STOP-LOSS-2) price))))
         price))))
 
 (defn wait-open-possibility! [price-changes strategy]
