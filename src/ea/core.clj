@@ -6,7 +6,8 @@
    [ea.db :as db]
    [ea.ds :as ds]
    [ea.ea :as ea]
-   [ea.gcloud :refer [download-file!]]))
+   [ea.gcloud :refer [download-file!]]
+   [ea.earn :as earn]))
 
 (set! *warn-on-reflection* true)
 
@@ -14,7 +15,9 @@
   [["-t" nil "Train"
     :id :train]
    ["-d" nil "Collect dataset"
-    :id :dataset]])
+    :id :dataset]
+   ["-e" nil "Earn"
+    :id :earn]])
 
 (defn -main [& args]
   (let [{:keys [options]} (parse-opts args cli-options)]
@@ -27,6 +30,9 @@
       (:train options) (do
                          (prn "training")
                          (ea/start-algorithm!))
+      (:earn options) (do
+                        (prn "earning")
+                        (earn/start!))
       :else
       "do nothing"))
   (System/exit 0))

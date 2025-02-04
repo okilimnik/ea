@@ -9,9 +9,12 @@
 (def market-client (atom nil))
 (def ws-client (atom nil))
 
+(defn init-earning []
+  (reset! trade-client (.createTrade (SpotClientImpl. (System/getenv "BINANCE_API_KEY")
+                                                      (System/getenv "BINANCE_SECRET"))))
+  (reset! market-client (.createMarket (SpotClientImpl.))))
+
 (defn init []
-  #_(reset! trade-client (.createTrade (SpotClientImpl. (System/getenv "BINANCE_API_KEY")
-                                                        (System/getenv "BINANCE_SECRET"))))
   (reset! market-client (.createMarket (SpotClientImpl.))))
 
 (defn subscribe [streams callback]

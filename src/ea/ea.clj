@@ -125,18 +125,6 @@
                                                    :else 0)
                                                  (/ (:price-change-divider (get TIMEFRAME->GENE k)))
                                                  math/round))))
-            #_(let [reality (price-changes->reality @price-changes)]
-                (swap! reality-ranges (fn [ranges]
-                                        (reduce-kv (fn [m k v]
-                                                     (let [rv (nth reality (:index (get TIMEFRAME->GENE k)))]
-                                                       (cond
-                                                         (< rv (:min v))
-                                                         (assoc-in m [k :min] rv)
-                                                         (> rv (:max v))
-                                                         (assoc-in m [k :max] rv)
-                                                         :else
-                                                         m))) ranges ranges)))
-                (spit "./reality.edn" (with-out-str (pprint/pprint @reality-ranges))))
             (let [price (wait-close-possibilty! @price-changes sell-strategy (:price @order))]
               (when price
                 (let [delta (- price (or (:price @order) price))]
@@ -154,7 +142,6 @@
           (swap! current-time jt/plus (jt/seconds DATASET-PRECISION-IN-SEC))
           (recur (drop DATASET-PRECISION-IN-SEC lines)))))
     ;; TODO: log to s3 bucket
-    ;; TODO: add stop loss
     ;(when (> @balance INITIAL-BALANCE)
     (Thread/sleep (* 300 (rand-int CONCURRENCY)))
     (println "balance left: " @balance)
