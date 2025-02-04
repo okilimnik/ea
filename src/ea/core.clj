@@ -37,4 +37,4 @@
       "do nothing"))
   (System/exit 0))
 
-;; GOOGLE_APPLICATION_CREDENTIALS=gcp.json clj -M -m ea.core -t
+;; GOOGLE_APPLICATION_CREDENTIALS=gcp.json clj -M -m ea.core -e

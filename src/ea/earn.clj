@@ -1,6 +1,6 @@
 (ns ea.earn
   (:require
-   [clojure.core.async :refer [thread]]
+   [clojure.core.async :refer [<!!]]
    [clojure.math :as math]
    [ea.binance :as binance :refer [jread]]
    [ea.scheduler :as scheduler])
@@ -99,20 +99,20 @@
    "quantity" TRADE-AMOUNT-BTC})
 
 (defn start-earning! []
-  (thread
-    (scheduler/start!
-     60000
-     (fn []
-       (when (= (count @prices-queue) PRICE-QUEUE-LENGTH)
-         (when @order
-           (let [price (wait-close-possibilty! @price-changes sell-strategy (:price @order))]
-             (when price
-               (binance/open-order! (create-sell-params "BTCUSDT"))
-               (reset! order nil))))
-         (let [price (wait-open-possibility! @price-changes buy-strategy)]
-           (when price
-             (binance/open-order! (create-buy-params "BTCUSDT"))
-             (reset! order {:price price}))))))))
+  (<!!
+   (scheduler/start!
+    60000
+    (fn []
+      (when (= (count @prices-queue) PRICE-QUEUE-LENGTH)
+        (when @order
+          (let [price (wait-close-possibilty! @price-changes sell-strategy (:price @order))]
+            (when price
+              (binance/open-order! (create-sell-params "BTCUSDT"))
+              (reset! order nil))))
+        (let [price (wait-open-possibility! @price-changes buy-strategy)]
+          (when price
+            (binance/open-order! (create-buy-params "BTCUSDT"))
+            (reset! order {:price price}))))))))
 
 (defn start! []
   (let [data-counter (atom 0)]
