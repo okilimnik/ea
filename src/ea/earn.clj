@@ -27,7 +27,7 @@
 (def prices-queue (atom clojure.lang.PersistentQueue/EMPTY))
 (def price-changes (atom {}))
 (def order (atom nil))
-(def TRADE-AMOUNT-BTC 0.0001)
+(def TRADE-AMOUNT-BTC 0.00001)
 
 (defn price-changes->reality [changes]
   (->> changes
@@ -84,18 +84,22 @@
                                          (/ (:price-change-divider (get TIMEFRAME->GENE k)))
                                          math/round))))))
 
-(defn create-buy-params [symbol]
+(defn create-buy-params [symbol price]
   (java.util.HashMap.
    {"symbol" symbol
     "side" "BUY"
-    "type" "MARKET"
+    "type" "LIMIT"
+    "timeInForce" "FOK"
+    "price" price
     "quantity" TRADE-AMOUNT-BTC}))
 
-(defn create-sell-params [symbol quantity]
+(defn create-sell-params [symbol price quantity]
   (java.util.HashMap.
    {"symbol" symbol
     "side" "SELL"
-    "type" "MARKET"
+    "type" "LIMIT"
+    "timeInForce" "FOK"
+    "price" price
     "quantity" quantity}))
 
 (defn start-earning! []
@@ -108,12 +112,14 @@
           (when @order
             (let [price (wait-close-possibilty! @price-changes sell-strategy (:price @order))]
               (when price
-                (binance/open-order! (create-sell-params SYMBOL (:quantity @order)))
+                (prn "wait-close-possibilty!: " price)
+                (binance/open-order! (create-sell-params SYMBOL price (:quantity @order)))
                 (reset! order nil))))
           (let [price (wait-open-possibility! @price-changes buy-strategy)]
             (when price
-              (let [{:keys [executedQty price]} (binance/open-order! (create-buy-params SYMBOL))]
-                (reset! order {:price (parse-double price)
+              (prn "wait-open-possibility!: " price)
+              (let [{:keys [executedQty]} (binance/open-order! (create-buy-params SYMBOL price))]
+                (reset! order {:price price
                                :quantity (parse-double executedQty)})))))
         (catch Exception e (println e)))))))
 
