@@ -19,8 +19,8 @@
 (def DATASET-PRECISION-IN-SEC 60)
 (def PRICE-QUEUE-LENGTH
   (/ (apply max (keys TIMEFRAME->GENE)) DATASET-PRECISION-IN-SEC))
-(def STOP-LOSS-1 0)
-(def STOP-LOSS-2 1000)
+(def STOP-PROFIT 40)
+(def STOP-LOSS 1000)
 (def buy-strategy [0 0])
 (def sell-strategy [0 -2])
 (def binance-stream (str (str/lower-case SYMBOL) "@depth5"))
@@ -45,9 +45,8 @@
           price (:bid-price price-changes)]
       (when (or (= strategy reality)
                 (and order-price
-                     ;(<= (+ order-price STOP-PROFIT) price)
-                     (or (<= (- order-price STOP-LOSS-1) price)
-                         (>= (- order-price STOP-LOSS-2) price))))
+                     (or (<= (+ order-price STOP-PROFIT) price)
+                         (>= (- order-price STOP-LOSS) price))))
         price))))
 
 (defn wait-open-possibility! [price-changes strategy]

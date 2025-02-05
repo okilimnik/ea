@@ -180,3 +180,12 @@ number of trades:  9206
 evaluation:  4345.958400001528
 buy-strategy:  [0 0]
 sell-strategy:  [0 -2]
+
+(def STOP-PROFIT 40)
+(def STOP-LOSS 1000)
+
+balance left:  344090.5100000031
+number of trades:  3979
+evaluation:  3432.7443000009594
+buy-strategy:  [0 0]
+sell-strategy:  [0 -2]
