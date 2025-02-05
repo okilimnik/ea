@@ -2,11 +2,13 @@
   (:require
    [clojure.core.async :refer [<!!]]
    [clojure.math :as math]
+   [clojure.string :as str]
    [ea.binance :as binance :refer [jread]]
    [ea.scheduler :as scheduler])
   (:import
    [com.binance.connector.client.utils.websocketcallback WebSocketMessageCallback]))
 
+(def SYMBOL "BTCUSDT")
 (def TIMEFRAME->GENE
   {300 {:index 0
         :price-max-change 5
@@ -21,7 +23,7 @@
 (def STOP-LOSS-2 1000)
 (def buy-strategy [0 0])
 (def sell-strategy [0 -2])
-(def binance-stream "btcusdt@depth5")
+(def binance-stream (str (str/lower-case SYMBOL) "@depth5"))
 (def prices-queue (atom clojure.lang.PersistentQueue/EMPTY))
 (def price-changes (atom {}))
 (def order (atom nil))
@@ -85,34 +87,37 @@
                                          math/round))))))
 
 (defn create-buy-params [symbol]
-  {"symbol" symbol
-   "side" "BUY"
-   "type" "MARKET"
-   "timeInForce" "GTC"
-   "quantity" TRADE-AMOUNT-BTC})
+  (java.util.HashMap.
+   {"symbol" symbol
+    "side" "BUY"
+    "type" "MARKET"
+    "quantity" TRADE-AMOUNT-BTC}))
 
-(defn create-sell-params [symbol]
-  {"symbol" symbol
-   "side" "SELL"
-   "type" "MARKET"
-   "timeInForce" "GTC"
-   "quantity" TRADE-AMOUNT-BTC})
+(defn create-sell-params [symbol quantity]
+  (java.util.HashMap.
+   {"symbol" symbol
+    "side" "SELL"
+    "type" "MARKET"
+    "quantity" quantity}))
 
 (defn start-earning! []
   (<!!
    (scheduler/start!
     60000
     (fn []
-      (when (= (count @prices-queue) PRICE-QUEUE-LENGTH)
-        (when @order
-          (let [price (wait-close-possibilty! @price-changes sell-strategy (:price @order))]
+      (try
+        (when (= (count @prices-queue) PRICE-QUEUE-LENGTH)
+          (when @order
+            (let [price (wait-close-possibilty! @price-changes sell-strategy (:price @order))]
+              (when price
+                (binance/open-order! (create-sell-params SYMBOL (:quantity @order)))
+                (reset! order nil))))
+          (let [price (wait-open-possibility! @price-changes buy-strategy)]
             (when price
-              (binance/open-order! (create-sell-params "BTCUSDT"))
-              (reset! order nil))))
-        (let [price (wait-open-possibility! @price-changes buy-strategy)]
-          (when price
-            (binance/open-order! (create-buy-params "BTCUSDT"))
-            (reset! order {:price price}))))))))
+              (let [{:keys [executedQty price]} (binance/open-order! (create-buy-params SYMBOL))]
+                (reset! order {:price (parse-double price)
+                               :quantity (parse-double executedQty)})))))
+        (catch Exception e (println e)))))))
 
 (defn start! []
   (let [data-counter (atom 0)]
