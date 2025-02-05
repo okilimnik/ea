@@ -44,9 +44,8 @@
                        price-changes->reality)
           price (:bid-price price-changes)]
       (when (or (= strategy reality)
-                (and order-price
-                     (or (<= (+ order-price STOP-PROFIT) price)
-                         (>= (- order-price STOP-LOSS) price))))
+                (<= (+ order-price STOP-PROFIT) price)
+                (>= (- order-price STOP-LOSS) price))
         price))))
 
 (defn wait-open-possibility! [price-changes strategy]
