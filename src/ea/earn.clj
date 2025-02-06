@@ -113,13 +113,15 @@
             (let [price (wait-close-possibilty! @price-changes sell-strategy (:price @order))]
               (when price
                 (prn "wait-close-possibilty!: " price)
-                (binance/open-order! (create-sell-params SYMBOL price (:quantity @order)))
+                (prn "sell order data: " (binance/open-order! (create-sell-params SYMBOL price (:quantity @order))))
                 (reset! order nil))))
           (let [price (wait-open-possibility! @price-changes buy-strategy)]
             (when price
               (prn "wait-open-possibility!: " price)
-              (let [{:keys [executedQty]} (binance/open-order! (create-buy-params SYMBOL price))]
-                (reset! order {:price price
+              (let [{:keys [executedQty orderId] :as order-data} (binance/open-order! (create-buy-params SYMBOL price))]
+                (prn "buy order data: " order-data)
+                (reset! order {:orderId orderId
+                               :price price
                                :quantity (parse-double executedQty)})))))
         (catch Exception e (println e)))))))
 
