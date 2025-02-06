@@ -27,7 +27,7 @@
 (def prices-queue (atom clojure.lang.PersistentQueue/EMPTY))
 (def price-changes (atom {}))
 (def order (atom nil))
-(def TRADE-AMOUNT-BTC 0.0001)
+(def TRADE-AMOUNT-BTC 0.0002)
 
 (defn price-changes->reality [changes]
   (->> changes
