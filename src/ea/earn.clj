@@ -84,48 +84,47 @@
                                          (/ (:price-change-divider (get TIMEFRAME->GENE k)))
                                          math/round))))))
 
-(defn create-buy-params [symbol price]
+(defn create-buy-params [symbol]
   (java.util.HashMap.
    {"symbol" symbol
     "side" "BUY"
-    "type" "LIMIT"
-    "timeInForce" "FOK"
-    "price" price
+    "type" "MARKET"
+    ;"timeInForce" "FOK"
+    ;"price" price
     "quantity" TRADE-AMOUNT-BTC}))
 
-(defn create-sell-params [symbol price quantity]
+(defn create-sell-params [symbol quantity]
   (java.util.HashMap.
    {"symbol" symbol
     "side" "SELL"
-    "type" "LIMIT"
-    "timeInForce" "FOK"
-    "price" price
+    "type" "MARKET"
+    ;"timeInForce" "FOK"
+    ;"price" price
     "quantity" quantity}))
 
-(defn start-earning! []
-  (<!!
-   (scheduler/start!
-    60000
-    (fn []
-      (try
-        (when (= (count @prices-queue) PRICE-QUEUE-LENGTH)
-          (when @order
-            (let [price (wait-close-possibilty! @price-changes sell-strategy (:price @order))]
-              (when price
-                (prn "price-changes: " @price-changes)
-                (prn "wait-close-possibilty!: " price)
-                (prn "sell order data: " (binance/open-order! (create-sell-params SYMBOL price (:quantity @order))))
-                (reset! order nil))))
-          (let [price (wait-open-possibility! @price-changes buy-strategy)]
-            (when price
-              (prn "price-changes: " @price-changes)
-              (prn "wait-open-possibility!: " price)
-              (let [{:keys [executedQty orderId] :as order-data} (binance/open-order! (create-buy-params SYMBOL price))]
-                (prn "buy order data: " order-data)
-                (reset! order {:orderId orderId
-                               :price price
-                               :quantity (parse-double executedQty)})))))
-        (catch Exception e (println e)))))))
+(defn earn! []
+  (try
+    (when (= (count @prices-queue) PRICE-QUEUE-LENGTH)
+      (when @order
+        (let [price (wait-close-possibilty! @price-changes sell-strategy (:price @order))]
+          (when price
+            (prn "price-changes: " @price-changes)
+            (prn "wait-close-possibilty!: " price)
+            (let [{:keys [status] :as order-data} (binance/open-order! (create-sell-params SYMBOL (:quantity @order)))]
+              (prn "sell order data: " order-data)
+              (when (= status "FILLED")
+                (reset! order nil))))))
+      (when-not @order
+        (let [price (wait-open-possibility! @price-changes buy-strategy)]
+          (when price
+            (prn "price-changes: " @price-changes)
+            (prn "wait-open-possibility!: " price)
+            (let [{:keys [executedQty status] :as order-data} (binance/open-order! (create-buy-params SYMBOL))]
+              (prn "buy order data: " order-data)
+              (when (= status "FILLED")
+                (reset! order {:price price
+                               :quantity (parse-double executedQty)})))))))
+    (catch Exception e (println e))))
 
 (defn start! []
   (let [data-counter (atom 0)]
@@ -138,10 +137,11 @@
                                                   data (:data event)]
                                               (when (= (:stream event) binance-stream)
                                                 (when (= @data-counter 0)
-                                                  (on-data data))
+                                                  (on-data data)
+                                                  (earn!))
                                                 (swap! data-counter (fn [v]
                                                                       (if (= (inc v) DATASET-PRECISION-IN-SEC)
                                                                         0
                                                                         (inc v))))))
                                             (catch Exception e (prn e)))))))
-  (start-earning!))
+  (<!! (scheduler/start! 60000 #())))
