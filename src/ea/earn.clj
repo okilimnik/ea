@@ -27,7 +27,7 @@
 (def prices-queue (atom clojure.lang.PersistentQueue/EMPTY))
 (def price-changes (atom {}))
 (def order (atom nil))
-(def TRADE-AMOUNT-BTC 0.00001)
+(def TRADE-AMOUNT-BTC 0.0001)
 
 (defn price-changes->reality [changes]
   (->> changes
@@ -112,11 +112,13 @@
           (when @order
             (let [price (wait-close-possibilty! @price-changes sell-strategy (:price @order))]
               (when price
+                (prn "price-changes: " @price-changes)
                 (prn "wait-close-possibilty!: " price)
                 (prn "sell order data: " (binance/open-order! (create-sell-params SYMBOL price (:quantity @order))))
                 (reset! order nil))))
           (let [price (wait-open-possibility! @price-changes buy-strategy)]
             (when price
+              (prn "price-changes: " @price-changes)
               (prn "wait-open-possibility!: " price)
               (let [{:keys [executedQty orderId] :as order-data} (binance/open-order! (create-buy-params SYMBOL price))]
                 (prn "buy order data: " order-data)
