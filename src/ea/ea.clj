@@ -14,10 +14,18 @@
 
 (def CONCURRENCY 8)
 (def DATASET-LENGTH-IN-HOURS (* 24 14)) ;; 14 days available
-(def DATASET-PRECISION-IN-SEC 60)
+(def DATASET-PRECISION-IN-SEC 5)
 (def POPULATION-SIZE 500)
 (def GENERATIONS 1000)
+(def TRADE-AMOUNT-BTC 0.001)
+(def COMISSION 0.001)
 (def TIMEFRAME->GENE
+  {15 {:index 0 :price-max-change 5 :price-change-divider 0.25}
+   30 {:index 1 :price-max-change 5 :price-change-divider 0.5}
+   60 {:index 2 :price-max-change 5 :price-change-divider 0.5}
+   120 {:index 3 :price-max-change 5 :price-change-divider 0.8}
+   300 {:index 4 :price-max-change 10  :price-change-divider 1}})
+#_(def TIMEFRAME->GENE
   {300 {:index 0
         :price-max-change 5
         :price-change-divider 1} ;; 5min
@@ -40,8 +48,6 @@
 (defn STRATEGY-COMPLEXITY []
   (count (keys TIMEFRAME->GENE)))
 (def INITIAL-BALANCE 1000)
-(def STOP-PROFIT 40)
-(def STOP-LOSS 1000)
 (defn PRICE-QUEUE-LENGTH []
   (/ (apply max (keys TIMEFRAME->GENE)) DATASET-PRECISION-IN-SEC))
 
@@ -54,15 +60,13 @@
        (map second)
        vec))
 
-(defn wait-close-possibilty! [price-changes strategy order-price]
+(defn wait-close-possibilty! [price-changes take-profit-strategy stop-loss-strategy]
   (when (seq price-changes)
     (let [reality (->> price-changes
                        price-changes->reality)
           price (:bid-price price-changes)]
-      (when (or (= strategy reality)
-                (and order-price
-                     (or (<= (+ order-price STOP-PROFIT) price)
-                         (>= (- order-price STOP-LOSS) price))))
+      (when (or (= stop-loss-strategy reality)
+                (= take-profit-strategy reality))
         price))))
 
 (defn wait-open-possibility! [price-changes strategy]
@@ -81,76 +85,112 @@
         (/ first-price)
         (* 100))))
 
+(defn valid? [strategy]
+  true
+  #_(let [[open-strategy take-profit-strategy stop-loss-strategy] strategy]
+    (and (= (vec (sort (map #(Math/abs %) open-strategy)))
+            (mapv #(Math/abs %) open-strategy))
+         (= (vec (sort (map #(Math/abs %) take-profit-strategy)))
+            (mapv #(Math/abs %) take-profit-strategy))
+         (= (vec (sort (map #(Math/abs %) stop-loss-strategy)))
+            (mapv #(Math/abs %) stop-loss-strategy)))))
+
 (defn simulate-intraday-trade! [strategy dataset]
-  (let [[buy-strategy sell-strategy] strategy
-        buy-strategy buy-strategy
-        sell-strategy sell-strategy
-        start-time (jt/local-date-time)
-        end-time (jt/plus start-time (jt/hours DATASET-LENGTH-IN-HOURS))
-        current-time (atom (jt/local-date-time))
-        order (atom nil)
-        balance (atom INITIAL-BALANCE)
-        evaluation (atom 0)
-        prices-queue (atom clojure.lang.PersistentQueue/EMPTY)
-        price-changes (atom {})
-        number-of-trades (atom 0)
-        price-queue-length (PRICE-QUEUE-LENGTH)
-        #_reality-ranges #_(atom {300 {:min 0 :max 0}
-                                  900 {:min 0 :max 0}
-                                  1800 {:min 0 :max 0}
-                                  3600 {:min 0 :max 0}
-                                  14400 {:min 0 :max 0}
-                                  86400 {:min 0 :max 0}})]
-    (loop [lines dataset]
-      (let [data (edn/read-string (first lines))
-            ready? (jt/after? @current-time end-time)]
-        (when (and data (not ready?))
-          (swap! prices-queue #(as-> % $
-                                 (conj $ (-> data :asks ffirst parse-double))
-                                 (if (> (count $) price-queue-length)
-                                   (pop $)
-                                   $)))
-          (when (= (count @prices-queue) price-queue-length)
-            (swap! price-changes assoc :ask-price (-> data :asks ffirst parse-double))
-            (swap! price-changes assoc :bid-price (-> data :bids ffirst parse-double))
-            (doseq [k (keys TIMEFRAME->GENE)]
-              (let [price-change-percent (get-price-change-percent k @prices-queue price-queue-length)]
-                (swap! price-changes assoc k (-> (cond
-                                                   (pos? price-change-percent)
-                                                   (min (:price-max-change (get TIMEFRAME->GENE k)) price-change-percent)
-                                                   (neg? price-change-percent)
-                                                   (max (- (:price-max-change (get TIMEFRAME->GENE k))) price-change-percent)
-                                                   :else 0)
-                                                 (/ (:price-change-divider (get TIMEFRAME->GENE k)))
-                                                 math/round))))
-            (let [price (wait-close-possibilty! @price-changes sell-strategy (:price @order))]
-              (when price
-                (let [delta (- price (or (:price @order) price))]
-                  (if @order
-                    (do 
-                      (swap! number-of-trades inc)
-                      (swap! evaluation #(+ % (/ delta 100))))
-                    (swap! evaluation + 0.0001))
-                  (swap! balance + delta)
-                  (reset! order nil))))
-            (let [price (wait-open-possibility! @price-changes buy-strategy)]
-              (when price
-                (swap! evaluation + 0.0001)
-                (reset! order {:price price}))))
-          (swap! current-time jt/plus (jt/seconds DATASET-PRECISION-IN-SEC))
-          (recur (drop DATASET-PRECISION-IN-SEC lines)))))
+    (if-not (valid? strategy)
+      (float 0)
+      (let [[open-strategy take-profit-strategy stop-loss-strategy] strategy
+            start-time (jt/local-date-time)
+            end-time (jt/plus start-time (jt/hours DATASET-LENGTH-IN-HOURS))
+            current-time (atom (jt/local-date-time))
+            order (atom nil)
+            balance (atom INITIAL-BALANCE)
+            evaluation (atom 0)
+            prices-queue (atom clojure.lang.PersistentQueue/EMPTY)
+            price-changes (atom {})
+            number-of-trades (atom 0)
+            price-queue-length (PRICE-QUEUE-LENGTH)
+            reality-ranges (atom {15 {:min 0 :max 0}
+                                  30 {:min 0 :max 0}
+                                  60 {:min 0 :max 0}
+                                  120 {:min 0 :max 0}
+                                  300 {:min 0 :max 0}
+                              ;900 {:min 0 :max 0}
+                              ;1800 {:min 0 :max 0}
+                              ;3600 {:min 0 :max 0}
+                              ;14400 {:min 0 :max 0}
+                              ;86400 {:min 0 :max 0}
+                              ;
+                                  })]
+        (loop [lines dataset]
+          (let [data (edn/read-string (first lines))
+                ready? (jt/after? @current-time end-time)]
+            (when (and data (not ready?))
+              (swap! prices-queue #(as-> % $
+                                     (conj $ (-> data :asks ffirst parse-double))
+                                     (if (> (count $) price-queue-length)
+                                       (pop $)
+                                       $)))
+              (when (= (count @prices-queue) price-queue-length)
+                (swap! price-changes assoc :ask-price (-> data :asks ffirst parse-double))
+                (swap! price-changes assoc :bid-price (-> data :bids ffirst parse-double))
+                (doseq [k (keys TIMEFRAME->GENE)]
+                  (let [price-change-percent (get-price-change-percent k @prices-queue price-queue-length)]
+                    (swap! price-changes assoc k (-> (cond
+                                                       (pos? price-change-percent)
+                                                       (min (:price-max-change (get TIMEFRAME->GENE k)) price-change-percent)
+                                                       (neg? price-change-percent)
+                                                       (max (- (:price-max-change (get TIMEFRAME->GENE k))) price-change-percent)
+                                                       :else 0)
+                                                     (/ (:price-change-divider (get TIMEFRAME->GENE k)))
+                                                     math/round))))
+                #_(let [reality (price-changes->reality @price-changes)]
+                  (swap! reality-ranges (fn [ranges]
+                                          (reduce-kv (fn [m k v]
+                                                       (let [rv (nth reality (:index (get TIMEFRAME->GENE k)))]
+                                                         (cond
+                                                           (< rv (:min v))
+                                                           (assoc-in m [k :min] rv)
+                                                           (> rv (:max v))
+                                                           (assoc-in m [k :max] rv)
+                                                           :else
+                                                           m))) ranges ranges))))
+                (let [price (wait-close-possibilty! @price-changes take-profit-strategy stop-loss-strategy)]
+                  (when price
+                    (swap! evaluation + 0.0001)
+                    (when @order
+                      (swap! evaluation + 0.0002)
+                      (let [comission (* COMISSION TRADE-AMOUNT-BTC price)]
+                        (swap! number-of-trades inc)
+                        (swap! balance + (- (* TRADE-AMOUNT-BTC price)
+                                            comission))
+                        (reset! order nil)))))
+                (let [price (wait-open-possibility! @price-changes open-strategy)]
+                  (when price
+                    (swap! evaluation + 0.0001)
+                    (when-not @order
+                      (let [comission (* COMISSION TRADE-AMOUNT-BTC price)]
+                        (swap! balance - (* TRADE-AMOUNT-BTC price) comission))
+                      (reset! order {:price price})))))
+              (swap! current-time jt/plus (jt/seconds DATASET-PRECISION-IN-SEC))
+              (recur (drop DATASET-PRECISION-IN-SEC lines)))))
+    ;(spit "./reality.edn" (with-out-str (pprint/pprint @reality-ranges)))
     ;; TODO: log to s3 bucket
     ;(when (> @balance INITIAL-BALANCE)
-    (Thread/sleep (* 300 (rand-int CONCURRENCY)))
-    (println "balance left: " @balance)
-    (println "number of trades: " @number-of-trades)
-    (println "evaluation: " @evaluation)
-    (println "buy-strategy: " buy-strategy)
-    (println "sell-strategy: " sell-strategy)
-    (println "reality: " (price-changes->reality @price-changes))
+        (when (= @number-of-trades 0)
+          (reset! balance INITIAL-BALANCE))
+        (let [final-eval (float (+ @evaluation (/ (- @balance INITIAL-BALANCE) 1000)))]
+          (Thread/sleep (* 300 (rand-int CONCURRENCY)))
+          (println "balance left: " @balance)
+          (println "number of trades: " @number-of-trades)
+          (println "evaluation: " final-eval)
+          (println "open-strategy: " open-strategy)
+          (println "take-profit-strategy: " take-profit-strategy)
+          (println "stop-loss-strategy: " stop-loss-strategy)
+          (println "reality: " (price-changes->reality @price-changes))
+      ;(println "reality: " (price-changes->reality @price-changes))
       ;)
 
-    (float @evaluation)))
+          final-eval))))
 
 (defn eval! [dataset gt]
   (let [strategy (->> (range (.length gt))
@@ -164,12 +204,10 @@
 
 (defn price-change-genotype []
   (->> (for [k (sort (keys TIMEFRAME->GENE))
-             :let [change (-> (:price-max-change (get TIMEFRAME->GENE k))
-                              (/ (:price-change-divider (get TIMEFRAME->GENE k)))
-                              math/round)
+             :let [change 5
                    gene (LongGene/of (- change) change)]]
          (LongChromosome/of [gene]))
-       (repeat 2)
+       (repeat 3)
        (mapcat identity)
        Genotype/of))
 
