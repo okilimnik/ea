@@ -156,9 +156,9 @@
                                                            m))) ranges ranges))))
                 (let [price (wait-close-possibilty! @price-changes take-profit-strategy stop-loss-strategy)]
                   (when price
-                    (swap! evaluation + 0.0001)
+                    (swap! evaluation + 0.001)
                     (when @order
-                      (swap! evaluation + 0.0002)
+                      (swap! evaluation + 0.002)
                       (let [comission (* COMISSION TRADE-AMOUNT-BTC price)]
                         (swap! number-of-trades inc)
                         (swap! balance + (- (* TRADE-AMOUNT-BTC price)
@@ -166,7 +166,7 @@
                         (reset! order nil)))))
                 (let [price (wait-open-possibility! @price-changes open-strategy)]
                   (when price
-                    (swap! evaluation + 0.0001)
+                    (swap! evaluation + 0.001)
                     (when-not @order
                       (let [comission (* COMISSION TRADE-AMOUNT-BTC price)]
                         (swap! balance - (* TRADE-AMOUNT-BTC price) comission))
